@@ -1,0 +1,27 @@
+{
+  "uid_counter": 2,
+  "registros": [
+    {
+      "uid": 1,
+      "numero": 1,
+      "fecha": "2026-09-18",
+      "nombre": "test",
+      "direccion": "av corrientes 1111",
+      "objecion": "El dueño no se encontraba en el local.",
+      "hora_registro": "15:54:56",
+      "hora_programada": "15:56:56",
+      "hora_programada_iso": "2026-09-18T15:56:56.941314-03:00",
+      "hora_envio_real": "15:57:16",
+      "estado": "enviado",
+      "foto": "local_1_Captura de pantalla 2026-06-19 225245.png",
+      "filepath": "C:\\Users\\gonza\\auto_work_gednet_bot\\uploads\\local_1_Captura de pantalla 2026-06-19 225245.png",
+      "hora_manual": false
+    }
+  ],
+  "calles": {
+    "fecha": "2026-09-18",
+    "lista": [
+      "av corrientes"
+    ]
+  }
+}

@@ -1,5 +1,6 @@
 Flask
 APScheduler
-requests
 pytz
+requests
+PyMySQL
 gunicorn

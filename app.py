@@ -1,51 +1,71 @@
-import json
 import os
+import sys
+import time
 import random
 import threading
+import traceback
+from datetime import datetime, timedelta, time as dtime, date
 from urllib.parse import quote
 
-import requests
-from datetime import datetime, timedelta, time as dtime
+import pymysql
+import pymysql.cursors
 import pytz
+import requests
 from flask import (
     Flask, render_template_string, request, flash, redirect, url_for,
-    send_from_directory, jsonify
+    jsonify, session, Response
 )
+from werkzeug.security import generate_password_hash, check_password_hash
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.jobstores.base import JobLookupError
+from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
 
-app = Flask(__name__)
-app.secret_key = "admin123"
-
-# Configuración de Telegram y archivos
-TELEGRAM_TOKEN = "8736941358:AAG8aDuoEUkxNULlP2iewoJrcBM_VF0_fEk"
-CHAT_ID = "6060692704"
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-# Archivo donde se persiste TODO el historial (sobrevive reinicios del server)
-DATA_FILE = os.path.join(BASE_DIR, 'datos.json')
-
-# Zona horaria de Argentina
 ARG_TZ = pytz.timezone('America/Argentina/Buenos_Aires')
 
-# ------------------------------------------------------------------
-# Configuración de la ventana horaria de envíos
-# ------------------------------------------------------------------
-HORA_APERTURA = dtime(10, 0)      # la app "abre" a las 10:00
-HORA_CIERRE = dtime(15, 55)       # el ÚLTIMO local del día SIEMPRE se manda a las 15:55
-BUFFER_INICIAL_MINUTOS = 18       # margen entre las 10:00 y el primer envío del día (10:18)
-INTERVALO_MINIMO_MINUTOS = 2      # separación mínima absoluta entre un local y el siguiente
-MARGEN_JITTER_MINUTOS = 20        # variabilidad agregada a los horarios intermedios
 
-# Meta diaria de locales, solo informativa para el usuario
+# ============================================================================
+# LOG DE DEBUG (sale por la terminal)
+# ============================================================================
+def log(tag, msg=""):
+    hora = datetime.now(ARG_TZ).strftime("%H:%M:%S")
+    print(f"[{hora}] [{tag:<9}] {msg}", flush=True)
+
+
+def _env(nombre, default=None):
+    valor = os.environ.get(nombre, default)
+    if valor in (None, ""):
+        print(f"❌ Falta la variable de entorno: {nombre}", flush=True)
+        sys.exit(1)
+    return valor
+
+
+app = Flask(__name__)
+app.secret_key = _env("KEY_SECRET")
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+app.permanent_session_lifetime = timedelta(days=30)
+
+TELEGRAM_TOKEN = _env("TELEGRAM_TOKEN")
+CHAT_ID = _env("CHAT_ID")
+
+DB_CONFIG = dict(
+    host=_env("DB_HOST"),
+    port=int(os.environ.get("DB_PORT", 3306)),
+    user=_env("DB_USER"),
+    password=_env("DB_PASSWORD"),
+    database=_env("DB_NAME"),
+    charset="utf8mb4",
+    cursorclass=pymysql.cursors.DictCursor,   # filas como dict  (¡faltaba!)
+    autocommit=True,                          # confirma cada INSERT/UPDATE (¡faltaba!)
+    connect_timeout=10,
+)
+
+HORA_APERTURA = dtime(10, 0)
+HORA_CIERRE = dtime(15, 55)
+BUFFER_INICIAL_MINUTOS = 18
+INTERVALO_MINIMO_MINUTOS = 2
+MARGEN_JITTER_MINUTOS = 20
 TOTAL_LOCALES_OBJETIVO = 20
-
-# Valor especial del select de objeciones que dispara la elección aleatoria
 OBJECION_RANDOM = "Random"
 
-# Lista de objeciones disponibles (se sirve también vía /api/objeciones)
 OBJECIONES = [
     "El dueño no se encontraba en el local.",
     "Ya tenian mercado pago y no lo quieren cambiar.",
@@ -57,360 +77,454 @@ OBJECIONES = [
     "No estan interesados.",
 ]
 
-# Nombres en español para armar fechas del estilo "Jueves 19 de Septiembre"
 DIAS_ES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 MESES_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
 
 def fecha_larga(fecha_iso):
-    """Convierte '2026-09-19' en 'Jueves 19 de Septiembre'."""
     try:
-        d = datetime.strptime(fecha_iso, "%Y-%m-%d")
+        d = datetime.strptime(str(fecha_iso), "%Y-%m-%d")
     except (ValueError, TypeError):
         return fecha_iso or ""
     return f"{DIAS_ES[d.weekday()]} {d.day} de {MESES_ES[d.month - 1]}"
 
 
-# Estado en memoria: almacena la fecha del 'día actual' y las calles registradas
-estado_calles = {
-    "fecha": datetime.now(ARG_TZ).strftime("%Y-%m-%d"),
-    "calles": set()
-}
-
-# Lock para proteger el estado compartido entre requests y el scheduler
 lock = threading.Lock()
+scheduler = BackgroundScheduler(timezone=ARG_TZ)
 
-# uid_counter: identificador interno único que NUNCA se reinicia (clave del dict).
-# El "numero" que ve el usuario sí se reinicia todos los días (Local N° 1, 2, 3...).
-uid_counter = 1
 
-# Historial COMPLETO de locales (de todos los días).
-# clave: uid interno -> dict con la info del local (incluye "fecha" y "numero")
-registros = {}
+def _listener(event):
+    """Muestra en consola el resultado de cada job (si no, los errores se tragan en silencio)."""
+    if event.code == EVENT_JOB_ERROR:
+        log("SCHEDULER", f"❌ El job {event.job_id} FALLÓ: {event.exception!r}")
+        log("SCHEDULER", event.traceback or "")
+    elif event.code == EVENT_JOB_MISSED:
+        log("SCHEDULER", f"⚠️ El job {event.job_id} se perdió su horario (misfire)")
+    else:
+        log("SCHEDULER", f"✅ Job {event.job_id} ejecutado")
 
-scheduler = BackgroundScheduler()
+
+scheduler.add_listener(_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED)
 scheduler.start()
 
 
 # ============================================================================
-# PERSISTENCIA — todo se guarda en disco para que sobreviva recargas y caídas
+# BASE DE DATOS
 # ============================================================================
-def guardar_estado():
-    """
-    Vuelca el historial completo a datos.json. Se llama después de cada
-    cambio (alta, edición, envío, borrado, reprogramación), así que si la
-    página se recarga o el servidor se reinicia, no se pierde nada.
-    """
+def get_conn():
+    t0 = time.time()
     try:
-        with lock:
-            data = {
-                "uid_counter": uid_counter,
-                "registros": list(registros.values()),
-                "calles": {
-                    "fecha": estado_calles["fecha"],
-                    "lista": sorted(list(estado_calles["calles"])),
-                },
-            }
-        tmp = DATA_FILE + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, DATA_FILE)   # escritura atómica: nunca queda a medias
-    except OSError as e:
-        print(f"[persistencia] No se pudo guardar: {e}")
+        conn = pymysql.connect(**DB_CONFIG)
+    except Exception as e:
+        log("DB", f"❌ No se pudo conectar a {DB_CONFIG['host']}:{DB_CONFIG['port']} "
+                  f"(db={DB_CONFIG['database']}): {e!r}")
+        raise
+    log("DB", f"🔌 Conexión abierta ({(time.time() - t0) * 1000:.0f} ms)")
+    return conn
 
 
-def cargar_estado():
-    """Levanta el historial de datos.json al arrancar el servidor."""
-    global uid_counter
-    if not os.path.exists(DATA_FILE):
-        return
+def _resumen_args(args):
+    """Resume los argumentos para el log (los BLOB de fotos se muestran como tamaño)."""
+    out = []
+    for a in args:
+        if isinstance(a, (bytes, bytearray)):
+            out.append(f"<{len(a)} bytes>")
+        else:
+            s = repr(a)
+            out.append(s if len(s) < 60 else s[:57] + "...")
+    return out
+
+
+def _sql_corto(sql):
+    return " ".join(sql.split())[:110]
+
+
+def ejecutar(sql, args=()):
+    """INSERT/UPDATE/DELETE. Devuelve lastrowid."""
+    log("DB", f"✍️  {_sql_corto(sql)} | args={_resumen_args(args)}")
+    conn = get_conn()
     try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, ValueError) as e:
-        print(f"[persistencia] No se pudo leer {DATA_FILE}: {e}")
-        return
+        with conn.cursor() as cur:
+            filas = cur.execute(sql, args)
+            conn.commit()   # explícito, por si autocommit falla
+            log("DB", f"✅ OK -> filas afectadas={filas}, lastrowid={cur.lastrowid}")
+            return cur.lastrowid
+    except Exception as e:
+        log("DB", f"❌ ERROR en escritura: {e!r}")
+        raise
+    finally:
+        conn.close()
 
-    with lock:
-        uid_counter = data.get("uid_counter", 1)
-        for r in data.get("registros", []):
-            if "uid" in r:
-                registros[r["uid"]] = r
-        calles_guardadas = data.get("calles", {})
-        estado_calles["fecha"] = calles_guardadas.get(
-            "fecha", datetime.now(ARG_TZ).strftime("%Y-%m-%d"))
-        estado_calles["calles"] = set(calles_guardadas.get("lista", []))
 
-    print(f"[persistencia] {len(registros)} locales cargados desde disco.")
+def _norm(r):
+    if r is None:
+        return None
+    if isinstance(r.get("fecha"), date):
+        r["fecha"] = r["fecha"].isoformat()
+    if "hora_manual" in r:
+        r["hora_manual"] = bool(r["hora_manual"])
+    return r
+
+
+def uno(sql, args=()):
+    log("DB", f"🔎 {_sql_corto(sql)} | args={_resumen_args(args)}")
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, args)
+            fila = cur.fetchone()
+            log("DB", f"   -> {'1 fila' if fila else 'sin resultados'}")
+            return _norm(fila)
+    except Exception as e:
+        log("DB", f"❌ ERROR en lectura: {e!r}")
+        raise
+    finally:
+        conn.close()
+
+
+def todos(sql, args=()):
+    log("DB", f"🔎 {_sql_corto(sql)} | args={_resumen_args(args)}")
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, args)
+            filas = cur.fetchall()
+            log("DB", f"   -> {len(filas)} fila(s)")
+            return [_norm(r) for r in filas]
+    except Exception as e:
+        log("DB", f"❌ ERROR en lectura: {e!r}")
+        raise
+    finally:
+        conn.close()
+
+
+CAMPOS = ("id AS uid, usuario, nombre, direccion, objecion, fecha, numero, estado, "
+          "hora_registro, hora_programada, hora_programada_iso, hora_envio_real, hora_manual")
+
+
+def probar_conexion():
+    """Chequeo de arranque: si algo está mal con la BD, se ve ACÁ."""
+    log("ARRANQUE", "=" * 60)
+    log("ARRANQUE", "🚀 Versión con MySQL (Clever Cloud) — NO usa datos.json ni localStorage")
+    log("ARRANQUE", f"🗄️  Host={DB_CONFIG['host']}:{DB_CONFIG['port']} "
+                    f"| DB={DB_CONFIG['database']} | user={DB_CONFIG['user']}")
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DATABASE() AS db, VERSION() AS v, @@autocommit AS ac")
+            info = cur.fetchone()
+            log("ARRANQUE", f"✅ Conectado a '{info['db']}' | MySQL {info['v']} | autocommit={info['ac']}")
+    finally:
+        conn.close()
+
+
+def init_db():
+    probar_conexion()
+    ejecutar("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            email VARCHAR(150) NOT NULL UNIQUE,
+            username VARCHAR(80) NOT NULL UNIQUE,
+            password VARCHAR(255) NOT NULL
+        ) CHARACTER SET utf8mb4
+    """)
+    ejecutar("""
+        CREATE TABLE IF NOT EXISTS locales (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            usuario VARCHAR(80) NOT NULL,
+            nombre VARCHAR(200) NOT NULL,
+            direccion VARCHAR(255) NOT NULL,
+            objecion VARCHAR(255) NOT NULL DEFAULT '',
+            foto LONGBLOB,
+            foto_mime VARCHAR(60),
+            fecha DATE NOT NULL,
+            numero INT NOT NULL,
+            estado VARCHAR(12) NOT NULL DEFAULT 'pendiente',
+            hora_registro VARCHAR(8) NOT NULL DEFAULT '',
+            hora_programada VARCHAR(8) NOT NULL DEFAULT '',
+            hora_programada_iso VARCHAR(40) NOT NULL DEFAULT '',
+            hora_envio_real VARCHAR(8) NOT NULL DEFAULT '',
+            hora_manual TINYINT(1) NOT NULL DEFAULT 0,
+            INDEX idx_usuario_fecha (usuario, fecha)
+        ) CHARACTER SET utf8mb4
+    """)
+    nu = uno("SELECT COUNT(*) AS n FROM usuarios")["n"]
+    nl = uno("SELECT COUNT(*) AS n FROM locales")["n"]
+    log("ARRANQUE", f"📊 Estado actual de la BD: {nu} usuario(s), {nl} local(es)")
+    if nu == 0:
+        log("ARRANQUE", "⚠️ No hay usuarios. Creá uno con: python app.py crear_usuario mail user pass")
+
+
+def crear_usuario(email, username, password):
+    ejecutar("INSERT INTO usuarios (email, username, password) VALUES (%s, %s, %s)",
+             (email.strip().lower(), username.strip(), generate_password_hash(password)))
+
+
+def hoy_str():
+    return datetime.now(ARG_TZ).strftime("%Y-%m-%d")
+
+
+def obtener_local(uid, usuario=None):
+    r = uno(f"SELECT {CAMPOS} FROM locales WHERE id=%s", (uid,))
+    if r and usuario is not None and r["usuario"] != usuario:
+        log("SEGURIDAD", f"⛔ '{usuario}' intentó acceder al local {uid} de '{r['usuario']}'")
+        return None
+    return r
+
+
+def locales_de_hoy(usuario):
+    return todos(f"SELECT {CAMPOS} FROM locales WHERE usuario=%s AND fecha=%s ORDER BY id DESC",
+                 (usuario, hoy_str()))
+
+
+def contar_locales_hoy(usuario):
+    return uno("SELECT COUNT(*) AS n FROM locales WHERE usuario=%s AND fecha=%s",
+               (usuario, hoy_str()))["n"]
+
+
+def proximo_numero_del_dia(usuario):
+    return uno("SELECT COALESCE(MAX(numero),0)+1 AS n FROM locales WHERE usuario=%s AND fecha=%s",
+               (usuario, hoy_str()))["n"]
+
+
+def calles_de_hoy(usuario):
+    filas = todos("SELECT direccion FROM locales WHERE usuario=%s AND fecha=%s", (usuario, hoy_str()))
+    calles = set()
+    for f in filas:
+        partes = f["direccion"].rsplit(" ", 1)
+        calles.add(partes[0] if len(partes) == 2 else f["direccion"])
+    return sorted(calles)
+
+
+# ============================================================================
+# PROGRAMACIÓN DE ENVÍOS
+# ============================================================================
+def _agendar(uid, run_date):
+    scheduler.add_job(
+        func=enviar_reporte_telegram, trigger='date', run_date=run_date,
+        id=f"job_{uid}", replace_existing=True, args=[uid],
+        misfire_grace_time=3600,
+    )
+    log("SCHEDULER", f"🕒 Job job_{uid} agendado para {run_date.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def reprogramar_jobs_pendientes():
-    """
-    Después de un reinicio, los jobs del scheduler se pierden (viven en
-    memoria). Esta función los vuelve a crear para los locales de HOY que
-    quedaron pendientes.
-    """
-    hoy = datetime.now(ARG_TZ).strftime("%Y-%m-%d")
+    log("SCHEDULER", "♻️ Recreando jobs pendientes desde la BD...")
     ahora = datetime.now(ARG_TZ)
-
-    with lock:
-        pendientes_hoy = [r for r in registros.values()
-                          if r["estado"] == "pendiente" and r.get("fecha") == hoy]
-
-    for r in pendientes_hoy:
-        if not r.get("hora_manual"):
-            continue  # los automáticos los reagenda recalcular_horarios_pendientes()
+    pendientes = todos(f"SELECT {CAMPOS} FROM locales WHERE estado='pendiente' AND fecha=%s", (hoy_str(),))
+    usuarios = set()
+    for r in pendientes:
+        usuarios.add(r["usuario"])
+        if not r["hora_manual"]:
+            continue
         try:
             run_date = datetime.fromisoformat(r["hora_programada_iso"])
-        except (ValueError, KeyError):
+        except ValueError:
             continue
         if run_date <= ahora:
             run_date = ahora + timedelta(minutes=INTERVALO_MINIMO_MINUTOS)
-        try:
-            scheduler.add_job(
-                func=enviar_reporte_telegram, trigger='date', run_date=run_date,
-                id=f"job_{r['uid']}", replace_existing=True,
-                args=[r["uid"], r["nombre"], r["direccion"], r["filepath"], r["objecion"]]
-            )
-        except Exception as e:
-            print(f"[scheduler] No se pudo reagendar {r['uid']}: {e}")
-
-    recalcular_horarios_pendientes()
+        _agendar(r["uid"], run_date)
+    for u in usuarios:
+        recalcular_horarios_pendientes(u)
+    log("SCHEDULER", f"♻️ Listo: {len(pendientes)} pendiente(s), {len(usuarios)} usuario(s)")
 
 
-def verificar_dia():
-    """
-    Si cambió el día (hora de Argentina), limpia las calles sugeridas.
-    OJO: el historial de locales NO se borra nunca — queda disponible en la
-    sección "Lista de locales", agrupado por fecha.
-    """
-    hoy = datetime.now(ARG_TZ).strftime("%Y-%m-%d")
-    cambio = False
+def recalcular_horarios_pendientes(usuario):
     with lock:
-        if estado_calles["fecha"] != hoy:
-            estado_calles["fecha"] = hoy
-            estado_calles["calles"].clear()
-            cambio = True
-    if cambio:
-        guardar_estado()
+        ahora = datetime.now(ARG_TZ)
+        apertura = ARG_TZ.localize(datetime.combine(ahora.date(), HORA_APERTURA))
+        cierre = ARG_TZ.localize(datetime.combine(ahora.date(), HORA_CIERRE))
+
+        pendientes = todos(
+            "SELECT id AS uid FROM locales WHERE usuario=%s AND fecha=%s "
+            "AND estado='pendiente' AND hora_manual=0 ORDER BY id",
+            (usuario, ahora.strftime("%Y-%m-%d")))
+        n = len(pendientes)
+        log("HORARIOS", f"Recalculando para '{usuario}': {n} pendiente(s) automático(s)")
+        if n == 0:
+            return
+
+        fin_calculo = cierre
+        if ahora < apertura:
+            inicio_calculo = apertura + timedelta(minutes=BUFFER_INICIAL_MINUTOS)
+        else:
+            restante_seg = max((fin_calculo - ahora).total_seconds(), 0)
+            paso_natural_min = (restante_seg / 60.0) / n
+            offset_min = max(INTERVALO_MINIMO_MINUTOS, min(BUFFER_INICIAL_MINUTOS, paso_natural_min))
+            inicio_calculo = ahora + timedelta(minutes=offset_min)
+
+        if fin_calculo <= inicio_calculo:
+            fin_calculo = inicio_calculo + timedelta(minutes=INTERVALO_MINIMO_MINUTOS * max(n - 1, 0))
+
+        if n == 1:
+            horarios = [fin_calculo]
+        else:
+            paso = (fin_calculo - inicio_calculo).total_seconds() / (n - 1)
+            horarios = [inicio_calculo + timedelta(seconds=paso * i) for i in range(n)]
+            jitter_seg = min(MARGEN_JITTER_MINUTOS * 60, paso * 0.4)
+            for i in range(1, n - 1):
+                horarios[i] += timedelta(seconds=random.uniform(-jitter_seg, jitter_seg))
+            horarios[-1] = fin_calculo
+            horarios.sort()
+            horarios = [max(h, inicio_calculo) for h in horarios]
+            for i in range(1, n):
+                minimo = horarios[i - 1] + timedelta(minutes=INTERVALO_MINIMO_MINUTOS)
+                if horarios[i] < minimo:
+                    horarios[i] = minimo
+
+        for reg, h in zip(pendientes, horarios):
+            log("HORARIOS", f"Local id={reg['uid']} -> {h.strftime('%H:%M:%S')}")
+            ejecutar("UPDATE locales SET hora_programada=%s, hora_programada_iso=%s WHERE id=%s",
+                     (h.strftime("%H:%M:%S"), h.isoformat(), reg["uid"]))
+            _agendar(reg["uid"], h)
 
 
-def obtener_calles_actualizadas():
-    """Limpia las calles si cambió el día según la hora de Argentina."""
-    verificar_dia()
-    with lock:
-        return sorted(list(estado_calles["calles"]))
-
-
-def registros_de_hoy():
-    hoy = datetime.now(ARG_TZ).strftime("%Y-%m-%d")
-    with lock:
-        return [r for r in registros.values() if r.get("fecha") == hoy]
-
-
-def contar_locales_hoy():
-    return len(registros_de_hoy())
-
-
-def proximo_numero_del_dia():
-    """El N° de local que ve el usuario se reinicia cada día: 1, 2, 3..."""
-    return len(registros_de_hoy()) + 1
-
-
-def recalcular_horarios_pendientes():
-    """
-    Recalcula y reprograma el horario de envío de TODOS los locales de HOY
-    que estén pendientes, repartiéndolos de forma equitativa entre el
-    momento actual (o las 10:18 si el día recién está arrancando) y las
-    15:55, que es siempre el límite para el último local del día.
-
-    Cada vez que se agrega un nuevo local, se elimina uno o se envía uno
-    manualmente, hay que volver a llamar a esta función para que los
-    horarios de los locales que todavía están pendientes se vuelvan a
-    repartir entre todos.
-
-    Para que no quede algo demasiado robótico (siempre el mismo intervalo
-    exacto), a los horarios intermedios se les agrega una variación
-    aleatoria de +/- MARGEN_JITTER_MINUTOS. El primero y el último
-    (siempre 15:55) no llevan variación.
-
-    IMPORTANTE sobre INTERVALO_MINIMO_MINUTOS (2 min): es solamente un
-    PISO de seguridad, para que nunca salgan dos locales casi pegados.
-    NO es el ritmo de envío. El ritmo siempre se calcula repartiendo de
-    forma proporcional el tiempo que queda entre ahora y las 15:55 entre
-    todos los pendientes, así se cubre la mayor parte posible de la
-    ventana horaria. Los 2 minutos sólo entran en juego si quedan tantos
-    locales y tan poco tiempo que el reparto proporcional daría menos que
-    eso.
-
-    Los locales cuya hora fue fijada a mano (hora_manual = True, vía
-    /ajustar_hora) quedan afuera de este reparto automático.
-    """
-    ahora = datetime.now(ARG_TZ)
-    hoy_str = ahora.strftime("%Y-%m-%d")
-    apertura = ARG_TZ.localize(datetime.combine(ahora.date(), HORA_APERTURA))
-    cierre = ARG_TZ.localize(datetime.combine(ahora.date(), HORA_CIERRE))
-
-    with lock:
-        pendientes = sorted(
-            (r for r in registros.values()
-             if r["estado"] == "pendiente"
-             and r.get("fecha") == hoy_str
-             and not r.get("hora_manual")),
-            key=lambda r: r["uid"]
-        )
-
-    n = len(pendientes)
-    if n == 0:
-        return
-
-    fin_calculo = cierre
-
-    # ------------------------------------------------------------------
-    # Punto de partida del cálculo.
-    #
-    # El primer pendiente NO se ancla a "ahora + 2 minutos": ese era el
-    # error que hacía que, al enviarse un local, el siguiente saltara a
-    # 2 minutos y se comiera toda la ventana horaria. Los 2 minutos son
-    # sólo un piso de seguridad (que nunca salgan dos locales casi
-    # pegados), no el ritmo de envío.
-    #
-    # El hueco inicial es proporcional: se calcula cuánto tiempo queda
-    # hasta las 15:55 y se divide por la cantidad de pendientes, de modo
-    # que el espacio entre "ahora" y el primer envío sea del mismo orden
-    # que el espacio entre un local y el siguiente. Ese hueco se limita
-    # entre 2 y 18 minutos.
-    # ------------------------------------------------------------------
-    if ahora < apertura:
-        # El día todavía no arrancó: el primero sale 10:18 como siempre.
-        inicio_calculo = apertura + timedelta(minutes=BUFFER_INICIAL_MINUTOS)
-    else:
-        restante_seg = max((fin_calculo - ahora).total_seconds(), 0)
-        paso_natural_min = (restante_seg / 60.0) / n
-        offset_min = max(INTERVALO_MINIMO_MINUTOS,
-                         min(BUFFER_INICIAL_MINUTOS, paso_natural_min))
-        inicio_calculo = ahora + timedelta(minutes=offset_min)
-
-    # Caso límite: si ya pasamos (o estamos muy cerca de) las 15:55,
-    # igual garantizamos el mínimo de 2 minutos entre locales y los
-    # mandamos lo antes posible, en cadena.
-    if fin_calculo <= inicio_calculo:
-        fin_calculo = inicio_calculo + timedelta(
-            minutes=INTERVALO_MINIMO_MINUTOS * max(n - 1, 0)
-        )
-
-    if n == 1:
-        # Si queda un solo pendiente, es el ÚLTIMO del día: va a las 15:55.
-        # (Antes se lo mandaba a "ahora + 2 min", que era el bug principal.)
-        horarios = [fin_calculo]
-    else:
-        total_segundos = (fin_calculo - inicio_calculo).total_seconds()
-        paso = total_segundos / (n - 1)
-        horarios = [inicio_calculo + timedelta(seconds=paso * i) for i in range(n)]
-
-        # Jitter en los horarios intermedios (no en el primero ni en el
-        # último). Se limita al 40% del paso: si hay muchos locales y el
-        # paso es chico, un margen fijo de 20 min los amontonaría.
-        jitter_seg = min(MARGEN_JITTER_MINUTOS * 60, paso * 0.4)
-        for i in range(1, n - 1):
-            horarios[i] += timedelta(seconds=random.uniform(-jitter_seg, jitter_seg))
-
-        horarios[-1] = fin_calculo  # el último SIEMPRE a las 15:55 (o al cierre calculado)
-
-        # Reordenar (el jitter puede desordenar), no dejar ninguno antes
-        # del inicio válido, y garantizar el mínimo de
-        # INTERVALO_MINIMO_MINUTOS entre locales consecutivos.
-        horarios.sort()
-        horarios = [max(h, inicio_calculo) for h in horarios]
-        for i in range(1, n):
-            minimo = horarios[i - 1] + timedelta(minutes=INTERVALO_MINIMO_MINUTOS)
-            if horarios[i] < minimo:
-                horarios[i] = minimo
-
-    # Reprogramar cada job y actualizar el registro correspondiente.
-    with lock:
-        for registro, nuevo_horario in zip(pendientes, horarios):
-            uid = registro["uid"]
-            registro["hora_programada"] = nuevo_horario.strftime("%H:%M:%S")
-            registro["hora_programada_iso"] = nuevo_horario.isoformat()
-
-            job_id = f"job_{uid}"
-            try:
-                scheduler.reschedule_job(job_id, trigger='date', run_date=nuevo_horario)
-            except JobLookupError:
-                scheduler.add_job(
-                    func=enviar_reporte_telegram,
-                    trigger='date',
-                    run_date=nuevo_horario,
-                    id=job_id,
-                    args=[uid, registro["nombre"], registro["direccion"],
-                          registro["filepath"], registro["objecion"]]
-                )
-
-    guardar_estado()
+# ---------------------------- Telegram --------------------------------------
+def _telegram(metodo, **kwargs):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/{metodo}"
+    resp = requests.post(url, timeout=60, **kwargs)
+    log("TELEGRAM", f"{metodo} -> HTTP {resp.status_code}")
+    if not resp.ok:
+        log("TELEGRAM", f"❌ Respuesta de Telegram: {resp.text[:300]}")
+    return resp
 
 
 def _post_telegram_texto(texto):
-    requests.post(
-        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-        json={"chat_id": CHAT_ID, "text": texto, "parse_mode": "Markdown"}
-    )
+    resp = _telegram("sendMessage", json={"chat_id": CHAT_ID, "text": texto, "parse_mode": "Markdown"})
+    if resp.status_code == 400:
+        # Un nombre con _ o * rompe el Markdown: se reintenta como texto plano
+        log("TELEGRAM", "↩️ Reintentando sin Markdown")
+        resp = _telegram("sendMessage", json={"chat_id": CHAT_ID, "text": texto})
+    resp.raise_for_status()
 
 
-def enviar_reporte_telegram(uid, nombre_local, direccion, filepath, objecion,
-                            encabezado=None, numero_mostrado=None):
-    """
-    Envía el reporte del local por Telegram, DESGLOSADO en varios mensajes:
-      0) (opcional) un encabezado, usado por el re-envío: "R.E FECHA: ..."
-      1) la foto del local
-      2) el nombre del local
-      3) la dirección (calle + altura)
-      4) la objeción registrada (o aviso de que no hubo objeción)
-    """
-    url_photo = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+def enviar_reporte_telegram(uid, encabezado=None):
+    log("ENVIO", f"▶️ Iniciando envío del local id={uid} (re-envío={bool(encabezado)})")
+    try:
+        r = uno("SELECT id AS uid, usuario, nombre, direccion, objecion, numero, estado, foto, foto_mime "
+                "FROM locales WHERE id=%s", (uid,))
+        if not r:
+            log("ENVIO", f"⚠️ El local {uid} ya no existe en la BD, se cancela")
+            return
+        if encabezado is None and r["estado"] == "enviado":
+            log("ENVIO", f"⚠️ El local {uid} ya estaba enviado, se omite")
+            return
 
-    # 0) Encabezado del re-envío (va arriba de todo)
-    if encabezado:
-        _post_telegram_texto(encabezado)
+        if encabezado:
+            _post_telegram_texto(encabezado)
 
-    if numero_mostrado is None:
-        with lock:
-            reg = registros.get(uid)
-            numero_mostrado = reg["numero"] if reg else uid
-
-    # 1) Foto del local
-    if filepath and os.path.exists(filepath):
-        with open(filepath, 'rb') as photo_file:
-            requests.post(
-                url_photo,
-                data={"chat_id": CHAT_ID, "caption": f"📌 Local N° {numero_mostrado}"},
-                files={"photo": photo_file}
+        if r["foto"]:
+            log("ENVIO", f"📷 Enviando foto ({len(r['foto'])} bytes)")
+            resp = _telegram(
+                "sendPhoto",
+                data={"chat_id": CHAT_ID, "caption": f"📌 Local N° {r['numero']}"},
+                files={"photo": (f"local_{uid}.jpg", r["foto"], r["foto_mime"] or "image/jpeg")},
             )
+            resp.raise_for_status()
+        else:
+            log("ENVIO", "⚠️ El local no tiene foto en la BD")
 
-    # 2) Nombre del local
-    _post_telegram_texto(f"{nombre_local}")
+        _post_telegram_texto(f"{r['nombre']}")
+        _post_telegram_texto(f"{r['direccion']}")
+        _post_telegram_texto(f" {r['objecion'] if r['objecion'] else 'Sin objeción registrada.'}")
 
-    # 3) Dirección y altura
-    _post_telegram_texto(f"{direccion}")
-
-    # 4) Objeción
-    _post_telegram_texto(f" {objecion if objecion else 'Sin objeción registrada.'}")
-
-    # Si es un envío normal (no un re-envío), marcar como enviado.
-    if encabezado is None:
-        with lock:
-            if uid in registros:
-                registros[uid]["estado"] = "enviado"
-                registros[uid]["hora_envio_real"] = datetime.now(ARG_TZ).strftime("%H:%M:%S")
-        # Como este local ya salió de la lista de "pendientes", hay que
-        # repartir de nuevo el tiempo restante entre los que quedan.
-        recalcular_horarios_pendientes()
-        guardar_estado()
+        if encabezado is None:
+            ejecutar("UPDATE locales SET estado='enviado', hora_envio_real=%s WHERE id=%s",
+                     (datetime.now(ARG_TZ).strftime("%H:%M:%S"), uid))
+            recalcular_horarios_pendientes(r["usuario"])
+        log("ENVIO", f"✅ Local id={uid} enviado correctamente")
+    except Exception as e:
+        log("ENVIO", f"❌ FALLÓ el envío del local {uid}: {e!r}")
+        log("ENVIO", traceback.format_exc())
+        raise   # el local queda 'pendiente' (no se marca como enviado si Telegram falló)
 
 
 # ============================================================================
-# DISEÑO — tokens y estilos base compartidos por las pantallas
+# LOGIN
+# ============================================================================
+@app.before_request
+def exigir_login():
+    if request.endpoint != "foto":
+        log("HTTP", f"{request.method} {request.path} | usuario={session.get('usuario')}")
+    if request.endpoint in ("login", "static"):
+        return
+    if "usuario" not in session:
+        log("LOGIN", f"🔒 Sin sesión, redirigiendo a /login (pedía {request.path})")
+        return redirect(url_for("login"))
+
+
+def usuario_actual():
+    return session["usuario"]
+
+
+HTML_LOGIN = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar sesión</title>
+    <style>""" + "%%BASE_CSS%%" + """
+    </style>
+</head>
+<body>
+<div class="page" style="margin-top:8vh;">
+    <div class="topbar"><h2>🔐 Iniciar sesión</h2></div>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}{% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+    <div class="card">
+        <form method="POST">
+            <div class="field">
+                <label>Usuario o email</label>
+                <input type="text" name="identificador" required autofocus autocomplete="username">
+            </div>
+            <div class="field">
+                <label>Contraseña</label>
+                <input type="password" name="password" required autocomplete="current-password"
+                       style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:14px;">
+            </div>
+            <button type="submit" class="btn-primary">Entrar</button>
+        </form>
+    </div>
+</div>
+</body>
+</html>
+"""
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        ident = request.form.get('identificador', '').strip()
+        password = request.form.get('password', '')
+        log("LOGIN", f"Intento de login con '{ident}'")
+        u = uno("SELECT username, password FROM usuarios WHERE username=%s OR email=%s",
+                (ident, ident.lower()))
+        if not u:
+            log("LOGIN", f"❌ No existe ningún usuario/email '{ident}' en la tabla usuarios")
+        elif not check_password_hash(u["password"], password):
+            log("LOGIN", f"❌ Contraseña incorrecta para '{u['username']}'")
+        else:
+            session.clear()
+            session.permanent = True
+            session["usuario"] = u["username"]
+            log("LOGIN", f"✅ Sesión iniciada: {u['username']}")
+            return redirect(url_for('index'))
+        flash("⚠️ Usuario o contraseña incorrectos.")
+    return render_template_string(HTML_LOGIN)
+
+
+@app.route('/logout')
+def logout():
+    log("LOGIN", f"👋 Logout de {session.get('usuario')}")
+    session.clear()
+    return redirect(url_for('login'))
+
+
+# ============================================================================
+# DISEÑO
 # ============================================================================
 BASE_CSS = """
 :root{
@@ -432,14 +546,11 @@ body{
 }
 a{ color:var(--brand-600); }
 h2{ font-size:19px; font-weight:700; letter-spacing:-0.01em; margin:0; color:var(--ink-900); }
-
 .page{ max-width:560px; margin:0 auto; }
 .page-wide{ max-width:1140px; margin:0 auto; }
-
 .topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap; }
 .navlinks{ display:flex; gap:14px; flex-wrap:wrap; }
 .navlinks a{ text-decoration:none; font-weight:600; font-size:13.5px; display:inline-flex; align-items:center; gap:6px; }
-
 .contador-wrap{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md);
     padding:13px 16px; margin-bottom:18px; box-shadow:var(--shadow-card); }
 .contador-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
@@ -447,16 +558,13 @@ h2{ font-size:19px; font-weight:700; letter-spacing:-0.01em; margin:0; color:var
 .contador-num{ font-size:13px; font-weight:700; color:var(--ink-900); }
 .contador-track{ height:6px; background:var(--paper); border-radius:99px; overflow:hidden; }
 .contador-fill{ height:100%; background:var(--brand-600); border-radius:99px; transition:width .4s ease; }
-
 .alert{ background:var(--green-100); color:var(--green-700); padding:11px 14px; margin-bottom:16px;
     border-radius:var(--radius-sm); font-size:13.5px; font-weight:500; border:1px solid #c7e9d5; }
-
 .card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg);
     padding:20px; box-shadow:var(--shadow-card); }
-
 .field{ margin-bottom:16px; }
 label{ display:block; margin-bottom:6px; font-weight:600; font-size:13px; color:var(--ink-700); }
-input[type="text"], input[type="number"], input[type="file"], input[type="time"], select{
+input[type="text"], input[type="password"], input[type="number"], input[type="file"], input[type="time"], select{
     width:100%; padding:10px 12px; border:1px solid var(--line);
     border-radius:var(--radius-sm); font-size:14px; background:var(--surface); color:var(--ink-900);
     font-family:inherit;
@@ -465,32 +573,25 @@ input:focus, select:focus{ outline:none; border-color:var(--brand-600); box-shad
 select{ appearance:none; -webkit-appearance:none;
     background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='%2357626C' d='M5.5 7.5l4.5 4.5 4.5-4.5z'/%3e%3c/svg%3e");
     background-repeat:no-repeat; background-position:right 10px center; padding-right:32px; }
-
 button{ font-family:inherit; }
 .btn-primary{ background:var(--brand-600); color:#fff; border:none; padding:12px 16px; border-radius:var(--radius-sm);
     cursor:pointer; font-size:14.5px; font-weight:600; width:100%; }
 .btn-primary:hover{ background:var(--brand-700); }
-
 .btn-pill{ display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:99px;
     font-size:12.5px; font-weight:600; border:1px solid transparent; cursor:pointer; white-space:nowrap;
     transition:background .15s ease, transform .05s ease; line-height:1; font-family:inherit; text-decoration:none; }
 .btn-pill:active{ transform:scale(.96); }
-
 .badge{ display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:99px;
     font-size:11.5px; font-weight:700; white-space:nowrap; }
 .badge-pendiente{ background:var(--amber-100); color:var(--amber-700); }
 .badge-enviado{ background:var(--green-100); color:var(--green-700); }
 .badge-manual{ background:var(--brand-100); color:var(--brand-700); font-size:10px; padding:2px 7px; margin-left:5px; }
-
 .empty{ text-align:center; padding:52px 20px; color:var(--ink-600); background:var(--surface);
     border:1px dashed var(--line); border-radius:var(--radius-lg); }
-
-/* Preview de foto + lightbox */
 .preview-box{ display:none; margin-top:10px; }
 .preview-thumb, .foto-actual{ display:block; max-width:200px; max-height:200px; border-radius:var(--radius-md);
     border:1px solid var(--line); cursor:zoom-in; object-fit:cover; }
 .preview-hint, .foto-hint{ font-size:12px; color:var(--ink-600); margin-top:6px; }
-
 .zoom-overlay{ display:none; position:fixed; inset:0; background:rgba(15,18,20,.9); z-index:1000;
     align-items:center; justify-content:center; overflow:auto; cursor:zoom-out; padding:20px; box-sizing:border-box; }
 .zoom-overlay.activo{ display:flex; }
@@ -499,9 +600,6 @@ button{ font-family:inherit; }
 .zoom-close{ position:fixed; top:16px; right:18px; color:#fff; font-size:22px; cursor:pointer; z-index:1001;
     width:36px; height:36px; display:flex; align-items:center; justify-content:center;
     background:rgba(255,255,255,.14); border-radius:50%; line-height:1; }
-
-/* Aviso de copia local (localStorage) */
-.cache-note{ font-size:11.5px; color:var(--ink-300); text-align:center; margin-top:18px; }
 """
 
 ZOOM_JS = """
@@ -531,33 +629,7 @@ ZOOM_HTML = """
     </div>
 """
 
-# JS que guarda una copia de todos los datos en el localStorage del navegador
-# en cada carga de página. Es un respaldo de lectura: si el servidor no
-# responde, la sección "Lista de locales" igual puede mostrar la última copia.
-CACHE_JS = """
-const CACHE_KEY = 'locales_backup_v1';
-
-function guardarCacheLocal(datos) {
-    try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({
-            guardado: new Date().toISOString(),
-            datos: datos
-        }));
-    } catch (e) {
-        console.warn('No se pudo guardar en localStorage:', e);
-    }
-}
-
-function leerCacheLocal() {
-    try {
-        const raw = localStorage.getItem(CACHE_KEY);
-        return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-        return null;
-    }
-}
-"""
-
+HTML_LOGIN = HTML_LOGIN.replace("%%BASE_CSS%%", BASE_CSS)
 
 HTML_FORM = """
 <!DOCTYPE html>
@@ -576,6 +648,7 @@ HTML_FORM = """
         <div class="navlinks">
             <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
             <a href="{{ url_for('lista') }}">🗂️ Lista</a>
+            <a href="{{ url_for('logout') }}">🚪 Salir ({{ session['usuario'] }})</a>
         </div>
     </div>
 
@@ -590,11 +663,7 @@ HTML_FORM = """
     </div>
 
     {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        {% for message in messages %}
-          <div class="alert">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
+      {% if messages %}{% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}{% endif %}
     {% endwith %}
 
     <div class="card">
@@ -603,33 +672,25 @@ HTML_FORM = """
                 <label>Local</label>
                 <input type="text" name="local" required placeholder="Ej: Sucursal Centro">
             </div>
-
             <div class="field">
                 <label>Calle</label>
                 <input type="text" name="calle" list="calles_registradas" required placeholder="Ej: Av. Corrientes" autocomplete="off">
                 <datalist id="calles_registradas">
-                    {% for calle in calles %}
-                        <option value="{{ calle }}"></option>
-                    {% endfor %}
+                    {% for calle in calles %}<option value="{{ calle }}"></option>{% endfor %}
                 </datalist>
             </div>
-
             <div class="field">
                 <label>Altura</label>
                 <input type="text" name="altura" required placeholder="Ej: 1234">
             </div>
-
             <div class="field">
                 <label>Objeción (si aplica)</label>
                 <select name="objecion">
                     <option value="">Sin objeción / venta realizada</option>
                     <option value="{{ objecion_random }}">🎲 Random — elige una al azar</option>
-                    {% for obj in objeciones %}
-                        <option value="{{ obj }}">{{ obj }}</option>
-                    {% endfor %}
+                    {% for obj in objeciones %}<option value="{{ obj }}">{{ obj }}</option>{% endfor %}
                 </select>
             </div>
-
             <div class="field">
                 <label>Foto del local</label>
                 <input type="file" name="foto" id="fotoInput" accept="image/*" required onchange="mostrarPreview(event)">
@@ -638,19 +699,13 @@ HTML_FORM = """
                     <div class="preview-hint">Click en la imagen para hacer zoom</div>
                 </div>
             </div>
-
             <button type="submit" class="btn-primary">Enviar registro</button>
         </form>
     </div>
-
-    <div class="cache-note" id="cacheNote"></div>
 </div>
 """ + ZOOM_HTML + """
-    <script id="datos-json" type="application/json">{{ datos_json | safe }}</script>
     <script>
-        """ + CACHE_JS + """
         """ + ZOOM_JS + """
-
         function mostrarPreview(event) {
             const file = event.target.files[0];
             const box = document.getElementById('previewBox');
@@ -660,25 +715,10 @@ HTML_FORM = """
             reader.onload = function(e) { img.src = e.target.result; box.style.display = 'block'; };
             reader.readAsDataURL(file);
         }
-
-        // Guardar copia local de todo el historial en cada carga
-        (function () {
-            try {
-                const datos = JSON.parse(document.getElementById('datos-json').textContent);
-                guardarCacheLocal(datos);
-                const cache = leerCacheLocal();
-                if (cache) {
-                    const f = new Date(cache.guardado);
-                    document.getElementById('cacheNote').textContent =
-                        '💾 Copia local guardada: ' + f.toLocaleString('es-AR');
-                }
-            } catch (e) { console.warn(e); }
-        })();
     </script>
 </body>
 </html>
 """
-
 
 HTML_DASHBOARD = """
 <!DOCTYPE html>
@@ -688,7 +728,6 @@ HTML_DASHBOARD = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Locales</title>
     <style>""" + BASE_CSS + """
-
         .table-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg);
             overflow:visible; box-shadow:var(--shadow-card); }
         table{ width:100%; border-collapse:collapse; }
@@ -700,12 +739,10 @@ HTML_DASHBOARD = """
             vertical-align:middle; position:relative; }
         tr:last-child td{ border-bottom:none; }
         tr:hover td{ background:#FAFBFB; }
-
         .thumb{ width:42px; height:42px; object-fit:cover; border-radius:8px; border:1px solid var(--line);
             cursor:zoom-in; display:block; }
         .countdown{ font-size:11px; color:var(--ink-600); margin-top:2px; }
         .objecion-cell{ max-width:190px; font-size:12px; color:var(--ink-600); }
-
         .action-groups{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; position:relative; }
         .btn-enviar{ background:var(--brand-600); color:#fff; }
         .btn-enviar:hover{ background:var(--brand-700); }
@@ -717,7 +754,6 @@ HTML_DASHBOARD = """
         .btn-auto:hover{ background:var(--paper); }
         .btn-manual{ background:var(--amber-100); color:var(--amber-700); border-color:var(--amber-200); }
         .btn-manual:hover{ background:#F5DFB0; }
-
         .conf-menu{ position:relative; display:inline-block; }
         .conf-panel{ display:none; position:absolute; right:0; top:calc(100% + 6px); background:var(--surface);
             border:1px solid var(--line); border-radius:var(--radius-md); box-shadow:0 10px 28px rgba(20,25,30,.16);
@@ -736,7 +772,6 @@ HTML_DASHBOARD = """
         .conf-time-row button{ padding:7px 11px; border-radius:8px; border:none; background:var(--brand-600);
             color:#fff; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
         .conf-time-row button:hover{ background:var(--brand-700); }
-
         @media (max-width: 760px){
             body{ padding:16px 10px 60px; }
             table, thead, tbody, tr{ display:block; width:100%; }
@@ -763,6 +798,7 @@ HTML_DASHBOARD = """
         <div class="navlinks">
             <a href="{{ url_for('index') }}">➕ Nuevo registro</a>
             <a href="{{ url_for('lista') }}">🗂️ Lista de locales</a>
+            <a href="{{ url_for('logout') }}">🚪 Salir ({{ session['usuario'] }})</a>
         </div>
     </div>
 
@@ -777,11 +813,7 @@ HTML_DASHBOARD = """
     </div>
 
     {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        {% for message in messages %}
-          <div class="alert">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
+      {% if messages %}{% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}{% endif %}
     {% endwith %}
 
     {% if registros %}
@@ -797,7 +829,7 @@ HTML_DASHBOARD = """
             {% for r in registros %}
             <tr>
                 <td class="td-photo" data-label="Foto">
-                    <img class="thumb" src="{{ url_for('uploaded_file', filename=r.foto) }}"
+                    <img class="thumb" src="{{ url_for('foto', uid=r.uid) }}"
                          alt="Foto local {{ r.numero }}" onclick="abrirZoom(this.src)">
                 </td>
                 <td data-label="N° Local">{{ r.numero }}</td>
@@ -823,7 +855,6 @@ HTML_DASHBOARD = """
                 </td>
                 <td class="td-actions" data-label="Acciones">
                     <div class="action-groups">
-                        <!-- Grupo 1: Enviar -->
                         {% if r.estado == 'pendiente' %}
                         <form method="POST" action="{{ url_for('enviar_ahora', uid=r.uid) }}"
                               onsubmit="return confirm('¿Enviar el Local N° {{ r.numero }} ahora mismo?');">
@@ -833,7 +864,6 @@ HTML_DASHBOARD = """
                         <span class="btn-pill chip-enviado">✅ Enviado</span>
                         {% endif %}
 
-                        <!-- Grupo 2: Conf -->
                         <div class="conf-menu">
                             <button type="button" class="btn-pill btn-conf" id="conf-btn-{{ r.uid }}"
                                     onclick="toggleConf(event, {{ r.uid }})">⚙️ Conf</button>
@@ -858,7 +888,6 @@ HTML_DASHBOARD = """
                             </div>
                         </div>
 
-                        <!-- Grupo 3: Manual / Auto -->
                         {% if r.estado == 'pendiente' %}
                             {% if r.hora_manual %}
                             <form method="POST" action="{{ url_for('auto_hora', uid=r.uid) }}">
@@ -879,15 +908,10 @@ HTML_DASHBOARD = """
     {% else %}
         <div class="empty">Todavía no hay locales registrados hoy.</div>
     {% endif %}
-
-    <div class="cache-note" id="cacheNote"></div>
 </div>
 """ + ZOOM_HTML + """
-    <script id="datos-json" type="application/json">{{ datos_json | safe }}</script>
     <script>
-        """ + CACHE_JS + """
         """ + ZOOM_JS + """
-
         function cerrarTodosLosConf() {
             document.querySelectorAll('.conf-panel.abierto').forEach(p => p.classList.remove('abierto'));
             document.querySelectorAll('.btn-conf.activo').forEach(b => b.classList.remove('activo'));
@@ -926,28 +950,13 @@ HTML_DASHBOARD = """
         setInterval(actualizarCountdowns, 1000);
         actualizarCountdowns();
 
-        // Refresco automático, pero sin interrumpir un menú Conf abierto
         setInterval(function () {
             if (!document.querySelector('.conf-panel.abierto')) window.location.reload();
         }, 30000);
-
-        // Copia local de todos los datos
-        (function () {
-            try {
-                const datos = JSON.parse(document.getElementById('datos-json').textContent);
-                guardarCacheLocal(datos);
-                const cache = leerCacheLocal();
-                if (cache) {
-                    document.getElementById('cacheNote').textContent =
-                        '💾 Copia local guardada: ' + new Date(cache.guardado).toLocaleString('es-AR');
-                }
-            } catch (e) { console.warn(e); }
-        })();
     </script>
 </body>
 </html>
 """
-
 
 HTML_LISTA = """
 <!DOCTYPE html>
@@ -957,10 +966,8 @@ HTML_LISTA = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lista de Locales</title>
     <style>""" + BASE_CSS + """
-
         .dia-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg);
             box-shadow:var(--shadow-card); margin-bottom:12px; overflow:hidden; }
-
         .dia-header{ display:flex; align-items:center; justify-content:space-between; gap:12px;
             padding:15px 18px; cursor:pointer; user-select:none; background:var(--surface);
             border:none; width:100%; font-family:inherit; text-align:left; }
@@ -972,10 +979,8 @@ HTML_LISTA = """
             padding:3px 10px; border-radius:99px; }
         .flecha{ font-size:12px; color:var(--ink-600); transition:transform .22s ease; display:inline-block; }
         .dia-card.abierto .flecha{ transform:rotate(180deg); }
-
         .dia-body{ display:none; border-top:1px solid var(--line); padding:6px 14px 14px; }
         .dia-card.abierto .dia-body{ display:block; }
-
         .local-row{ display:flex; gap:14px; align-items:flex-start; padding:14px 4px;
             border-bottom:1px solid var(--line); }
         .local-row:last-child{ border-bottom:none; }
@@ -989,7 +994,6 @@ HTML_LISTA = """
         .local-acciones{ flex-shrink:0; display:flex; align-items:flex-start; }
         .btn-reenviar{ background:var(--brand-600); color:#fff; }
         .btn-reenviar:hover{ background:var(--brand-700); }
-
         @media (max-width: 620px){
             .local-row{ flex-wrap:wrap; }
             .local-acciones{ width:100%; justify-content:flex-end; }
@@ -1003,34 +1007,28 @@ HTML_LISTA = """
         <div class="navlinks">
             <a href="{{ url_for('index') }}">➕ Nuevo registro</a>
             <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+            <a href="{{ url_for('logout') }}">🚪 Salir ({{ session['usuario'] }})</a>
         </div>
     </div>
 
     {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        {% for message in messages %}
-          <div class="alert">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
+      {% if messages %}{% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}{% endif %}
     {% endwith %}
 
     {% if dias %}
         {% for dia in dias %}
         <div class="dia-card {% if loop.first %}abierto{% endif %}" id="dia-{{ dia.fecha }}">
             <button type="button" class="dia-header" onclick="toggleDia('{{ dia.fecha }}')">
-                <div class="dia-titulo">
-                    <span class="dia-nombre">{{ dia.fecha_larga }}</span>
-                </div>
+                <div class="dia-titulo"><span class="dia-nombre">{{ dia.fecha_larga }}</span></div>
                 <div class="dia-meta">
                     <span class="dia-count">{{ dia.locales|length }} local{{ 'es' if dia.locales|length != 1 else '' }}</span>
                     <span class="flecha">▼</span>
                 </div>
             </button>
-
             <div class="dia-body">
                 {% for r in dia.locales %}
                 <div class="local-row">
-                    <img class="local-foto" src="{{ url_for('uploaded_file', filename=r.foto) }}"
+                    <img class="local-foto" src="{{ url_for('foto', uid=r.uid) }}"
                          alt="Local {{ r.numero }}" onclick="abrirZoom(this.src)">
                     <div class="local-datos">
                         <div class="local-nombre">Local N° {{ r.numero }} — {{ r.nombre }}</div>
@@ -1064,68 +1062,18 @@ HTML_LISTA = """
     {% else %}
         <div class="empty">Todavía no hay locales registrados.</div>
     {% endif %}
-
-    <div class="cache-note" id="cacheNote"></div>
 </div>
 """ + ZOOM_HTML + """
-    <script id="datos-json" type="application/json">{{ datos_json | safe }}</script>
     <script>
-        """ + CACHE_JS + """
         """ + ZOOM_JS + """
-
-        // Acordeón: abrir/cerrar el día. Se recuerda qué días quedaron
-        // abiertos usando el localStorage del navegador.
-        const DIAS_KEY = 'dias_abiertos_v1';
-
-        function diasAbiertos() {
-            try { return JSON.parse(localStorage.getItem(DIAS_KEY)) || []; }
-            catch (e) { return []; }
-        }
-        function guardarDiasAbiertos(lista) {
-            try { localStorage.setItem(DIAS_KEY, JSON.stringify(lista)); } catch (e) {}
-        }
         function toggleDia(fecha) {
             const card = document.getElementById('dia-' + fecha);
-            if (!card) return;
-            card.classList.toggle('abierto');
-            let abiertos = diasAbiertos();
-            if (card.classList.contains('abierto')) {
-                if (!abiertos.includes(fecha)) abiertos.push(fecha);
-            } else {
-                abiertos = abiertos.filter(f => f !== fecha);
-            }
-            guardarDiasAbiertos(abiertos);
+            if (card) card.classList.toggle('abierto');
         }
-
-        // Restaurar los días que el usuario había dejado abiertos
-        (function () {
-            const abiertos = diasAbiertos();
-            if (abiertos.length) {
-                document.querySelectorAll('.dia-card').forEach(c => c.classList.remove('abierto'));
-                abiertos.forEach(function (f) {
-                    const card = document.getElementById('dia-' + f);
-                    if (card) card.classList.add('abierto');
-                });
-            }
-        })();
-
-        // Copia local de todos los datos
-        (function () {
-            try {
-                const datos = JSON.parse(document.getElementById('datos-json').textContent);
-                guardarCacheLocal(datos);
-                const cache = leerCacheLocal();
-                if (cache) {
-                    document.getElementById('cacheNote').textContent =
-                        '💾 Copia local guardada: ' + new Date(cache.guardado).toLocaleString('es-AR');
-                }
-            } catch (e) { console.warn(e); }
-        })();
     </script>
 </body>
 </html>
 """
-
 
 HTML_EDIT = """
 <!DOCTYPE html>
@@ -1145,11 +1093,7 @@ HTML_EDIT = """
     </div>
 
     {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        {% for message in messages %}
-          <div class="alert">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
+      {% if messages %}{% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}{% endif %}
     {% endwith %}
 
     <div class="card">
@@ -1158,22 +1102,17 @@ HTML_EDIT = """
                 <label>Local</label>
                 <input type="text" name="local" required value="{{ registro.nombre }}">
             </div>
-
             <div class="field">
                 <label>Calle</label>
                 <input type="text" name="calle" list="calles_registradas" required value="{{ calle_actual }}" autocomplete="off">
                 <datalist id="calles_registradas">
-                    {% for calle in calles %}
-                        <option value="{{ calle }}"></option>
-                    {% endfor %}
+                    {% for calle in calles %}<option value="{{ calle }}"></option>{% endfor %}
                 </datalist>
             </div>
-
             <div class="field">
                 <label>Altura</label>
                 <input type="text" name="altura" required value="{{ altura_actual }}">
             </div>
-
             <div class="field">
                 <label>Objeción (si aplica)</label>
                 <select name="objecion">
@@ -1184,10 +1123,9 @@ HTML_EDIT = """
                     {% endfor %}
                 </select>
             </div>
-
             <div class="field">
                 <label>Foto actual</label>
-                <img class="foto-actual" src="{{ url_for('uploaded_file', filename=registro.foto) }}"
+                <img class="foto-actual" src="{{ url_for('foto', uid=registro.uid) }}"
                      alt="Foto actual" onclick="abrirZoom(this.src)">
                 <div class="foto-hint">Click para hacer zoom. Subí una nueva más abajo solo si querés reemplazarla.</div>
 
@@ -1198,7 +1136,6 @@ HTML_EDIT = """
                     <div class="preview-hint">Click en la imagen para hacer zoom</div>
                 </div>
             </div>
-
             <button type="submit" class="btn-primary">Guardar cambios</button>
         </form>
     </div>
@@ -1221,198 +1158,151 @@ HTML_EDIT = """
 """
 
 
-def datos_para_cache():
-    """Snapshot JSON del historial completo, para espejar en localStorage."""
-    with lock:
-        items = []
-        for r in registros.values():
-            item = {k: v for k, v in r.items() if k != "filepath"}
-            item["fecha_larga"] = fecha_larga(r.get("fecha", ""))
-            items.append(item)
-    items.sort(key=lambda r: r["uid"], reverse=True)
-    return json.dumps({"registros": items}, ensure_ascii=False)
 
 
+# ============================================================================
+# RUTAS
+# ============================================================================
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    global uid_counter
-    calles_actuales = obtener_calles_actualizadas()
+    usuario = usuario_actual()
 
     if request.method == 'POST':
-        nombre_local = request.form.get('local')
+        nombre_local = request.form.get('local', '').strip()
         calle = request.form.get('calle', '').strip()
         altura = request.form.get('altura', '').strip()
         objecion = request.form.get('objecion', '').strip()
         if objecion == OBJECION_RANDOM:
             objecion = random.choice(OBJECIONES)
+            log("REGISTRO", f"🎲 Objeción random elegida: {objecion}")
         foto = request.files.get('foto')
 
-        if calle:
-            with lock:
-                estado_calles["calles"].add(calle)
+        log("REGISTRO", f"Formulario recibido: local='{nombre_local}', calle='{calle}', "
+                        f"altura='{altura}', objecion='{objecion}', "
+                        f"foto={'sí (' + foto.filename + ')' if foto and foto.filename else 'NO'}")
 
-        direccion_completa = f"{calle} {altura}"
+        if foto and foto.filename:
+            contenido = foto.read()
+            log("REGISTRO", f"📷 Foto leída: {len(contenido)} bytes, mime={foto.mimetype}")
+            if not contenido:
+                flash("⚠️ La foto llegó vacía, probá de nuevo.")
+                return redirect(url_for('index'))
 
-        if foto:
-            numero_dia = proximo_numero_del_dia()
-            with lock:
-                uid = uid_counter
-                uid_counter += 1
+            numero_dia = proximo_numero_del_dia(usuario)
+            ahora = datetime.now(ARG_TZ)
+            try:
+                uid = ejecutar(
+                    "INSERT INTO locales (usuario, nombre, direccion, objecion, foto, foto_mime, fecha, numero, "
+                    "estado, hora_registro) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'pendiente',%s)",
+                    (usuario, nombre_local, f"{calle} {altura}".strip(), objecion,
+                     contenido, foto.mimetype or "image/jpeg",
+                     ahora.strftime("%Y-%m-%d"), numero_dia, ahora.strftime("%H:%M:%S")))
+            except Exception as e:
+                log("REGISTRO", f"❌ NO se pudo guardar en la BD: {e!r}")
+                log("REGISTRO", traceback.format_exc())
+                flash("❌ Error al guardar en la base de datos. Mirá la consola del servidor.")
+                return redirect(url_for('index'))
 
-            filename = f"local_{uid}_{foto.filename}"
-            filepath = os.path.join(UPLOAD_FOLDER, filename)
-            foto.save(filepath)
+            # Verificación: se relee con una conexión NUEVA para confirmar que quedó persistido
+            verif = uno("SELECT id, usuario, nombre, LENGTH(foto) AS bytes_foto FROM locales WHERE id=%s", (uid,))
+            if verif:
+                log("REGISTRO", f"💾 VERIFICADO en BD: id={verif['id']}, usuario={verif['usuario']}, "
+                                f"nombre={verif['nombre']}, foto={verif['bytes_foto']} bytes")
+            else:
+                log("REGISTRO", f"🚨 El INSERT devolvió id={uid} pero la fila NO está en la BD (¿commit?)")
 
-            hora_registro = datetime.now(ARG_TZ)
-
-            # Se guarda primero con un horario provisorio: el cálculo
-            # definitivo (repartido entre TODOS los pendientes de hoy,
-            # incluido este) lo hace recalcular_horarios_pendientes().
-            with lock:
-                registros[uid] = {
-                    "uid": uid,
-                    "numero": numero_dia,
-                    "fecha": hora_registro.strftime("%Y-%m-%d"),
-                    "nombre": nombre_local,
-                    "direccion": direccion_completa,
-                    "objecion": objecion,
-                    "hora_registro": hora_registro.strftime("%H:%M:%S"),
-                    "hora_programada": "",
-                    "hora_programada_iso": "",
-                    "hora_envio_real": "",
-                    "estado": "pendiente",
-                    "foto": filename,
-                    "filepath": filepath,
-                    "hora_manual": False,
-                }
-
-            recalcular_horarios_pendientes()
-
-            with lock:
-                hora_envio_str = registros[uid]["hora_programada"]
-
-            flash(f"✅ Registro guardado. Notificación programada para las {hora_envio_str} (Local N° {numero_dia}).")
+            recalcular_horarios_pendientes(usuario)
+            reg = obtener_local(uid)
+            flash(f"✅ Registro guardado. Notificación programada para las {reg['hora_programada']} (Local N° {numero_dia}).")
             return redirect(url_for('index'))
 
     return render_template_string(
         HTML_FORM,
-        calles=calles_actuales,
+        calles=calles_de_hoy(usuario),
         objeciones=OBJECIONES,
-        total_locales=contar_locales_hoy(),
+        total_locales=contar_locales_hoy(usuario),
         objetivo=TOTAL_LOCALES_OBJETIVO,
         objecion_random=OBJECION_RANDOM,
-        datos_json=datos_para_cache(),
     )
 
 
 @app.route('/dashboard')
 def dashboard():
-    verificar_dia()
-    lista_hoy = sorted(registros_de_hoy(), key=lambda r: r["uid"], reverse=True)
-    lista_con_url = []
+    usuario = usuario_actual()
+    lista_hoy = locales_de_hoy(usuario)
+    log("DASHBOARD", f"{len(lista_hoy)} local(es) de hoy para '{usuario}'")
     for r in lista_hoy:
-        item = dict(r)
-        item["direccion_url"] = quote(r["direccion"])
-        lista_con_url.append(item)
+        r["direccion_url"] = quote(r["direccion"])
     return render_template_string(
         HTML_DASHBOARD,
-        registros=lista_con_url,
-        total_locales=contar_locales_hoy(),
+        registros=lista_hoy,
+        total_locales=len(lista_hoy),
         objetivo=TOTAL_LOCALES_OBJETIVO,
-        datos_json=datos_para_cache(),
     )
 
 
 @app.route('/lista')
 def lista():
-    """
-    Historial completo agrupado por fecha, en menús desplegables:
-    "Jueves 19 de Septiembre ▼". Acá sólo se puede re-enviar la info.
-    """
-    verificar_dia()
-    with lock:
-        todos = list(registros.values())
-
+    usuario = usuario_actual()
+    todos_ = todos(f"SELECT {CAMPOS} FROM locales WHERE usuario=%s ORDER BY fecha DESC, numero ASC", (usuario,))
     agrupado = {}
-    for r in todos:
-        agrupado.setdefault(r.get("fecha", ""), []).append(r)
+    for r in todos_:
+        agrupado.setdefault(r["fecha"], []).append(r)
+    dias = [{"fecha": f, "fecha_larga": fecha_larga(f), "locales": l} for f, l in agrupado.items()]
+    log("LISTA", f"{len(todos_)} local(es) en {len(dias)} día(s)")
+    return render_template_string(HTML_LISTA, dias=dias)
 
-    dias = []
-    for fecha in sorted(agrupado.keys(), reverse=True):   # más reciente primero
-        locales = sorted(agrupado[fecha], key=lambda r: r["numero"])
-        dias.append({
-            "fecha": fecha,
-            "fecha_larga": fecha_larga(fecha),
-            "locales": locales,
-        })
 
-    return render_template_string(HTML_LISTA, dias=dias, datos_json=datos_para_cache())
+@app.route('/foto/<int:uid>')
+def foto(uid):
+    r = uno("SELECT usuario, foto, foto_mime FROM locales WHERE id=%s", (uid,))
+    if not r or r["usuario"] != usuario_actual() or not r["foto"]:
+        return Response(status=404)
+    resp = Response(r["foto"], mimetype=r["foto_mime"] or "image/jpeg")
+    resp.headers["Cache-Control"] = "private, max-age=3600"
+    return resp
 
 
 @app.route('/reenviar/<int:uid>', methods=['POST'])
 def reenviar(uid):
-    """
-    Re-envía la info de un local al chat, con un encabezado arriba de todo:
-        R.E FECHA: Jueves 19 de Septiembre
-    No cambia el estado del local ni su horario programado.
-    """
-    with lock:
-        registro = registros.get(uid)
-
+    registro = obtener_local(uid, usuario_actual())
     if not registro:
         flash("⚠️ No se encontró ese local.")
         return redirect(url_for('lista'))
-
-    encabezado = f"R.E FECHA: {fecha_larga(registro.get('fecha', ''))}"
-
-    enviar_reporte_telegram(
-        uid,
-        registro["nombre"],
-        registro["direccion"],
-        registro.get("filepath"),
-        registro["objecion"],
-        encabezado=encabezado,
-        numero_mostrado=registro["numero"],
-    )
-
-    flash(f"🔁 Local N° {registro['numero']} re-enviado al chat ({fecha_larga(registro.get('fecha', ''))}).")
+    try:
+        enviar_reporte_telegram(uid, encabezado=f"R.E FECHA: {fecha_larga(registro['fecha'])}")
+        flash(f"🔁 Local N° {registro['numero']} re-enviado al chat ({fecha_larga(registro['fecha'])}).")
+    except Exception as e:
+        flash(f"❌ No se pudo re-enviar: {e}")
     return redirect(url_for('lista'))
 
 
 @app.route('/enviar_ahora/<int:uid>', methods=['POST'])
 def enviar_ahora(uid):
-    """Envía el reporte de un local de inmediato, sin esperar su turno programado."""
-    with lock:
-        registro = registros.get(uid)
-
+    registro = obtener_local(uid, usuario_actual())
     if not registro:
         flash("⚠️ No se encontró ese local.")
         return redirect(url_for('dashboard'))
-
     if registro["estado"] == "enviado":
         flash(f"ℹ️ El Local N° {registro['numero']} ya fue enviado.")
         return redirect(url_for('dashboard'))
 
-    try:
+    if scheduler.get_job(f"job_{uid}"):
         scheduler.remove_job(f"job_{uid}")
-    except JobLookupError:
-        pass
-
-    enviar_reporte_telegram(
-        uid, registro["nombre"], registro["direccion"],
-        registro["filepath"], registro["objecion"],
-    )
-
-    flash(f"📤 Local N° {registro['numero']} enviado manualmente.")
+        log("SCHEDULER", f"🗑️ Job job_{uid} removido (envío manual)")
+    try:
+        enviar_reporte_telegram(uid)
+        flash(f"📤 Local N° {registro['numero']} enviado manualmente.")
+    except Exception as e:
+        reprogramar_jobs_pendientes()   # como falló, se vuelve a agendar
+        flash(f"❌ No se pudo enviar (queda pendiente): {e}")
     return redirect(url_for('dashboard'))
 
 
 @app.route('/editar/<int:uid>', methods=['GET', 'POST'])
 def editar(uid):
-    """Permite corregir los datos de un local ya registrado (pendiente o enviado)."""
-    with lock:
-        registro = registros.get(uid)
-
+    usuario = usuario_actual()
+    registro = obtener_local(uid, usuario)
     if not registro:
         flash("⚠️ No se encontró ese local.")
         return redirect(url_for('dashboard'))
@@ -1424,48 +1314,27 @@ def editar(uid):
         objecion = request.form.get('objecion', '').strip()
         if objecion == OBJECION_RANDOM:
             objecion = random.choice(OBJECIONES)
-        foto = request.files.get('foto')
+        foto_nueva = request.files.get('foto')
+        log("EDITAR", f"Local id={uid}: nombre='{nombre}', dir='{calle} {altura}', objecion='{objecion}', "
+                      f"foto_nueva={'sí' if foto_nueva and foto_nueva.filename else 'no'}")
 
-        if calle:
-            with lock:
-                estado_calles["calles"].add(calle)
+        ejecutar("UPDATE locales SET nombre=%s, direccion=%s, objecion=%s WHERE id=%s",
+                 (nombre, f"{calle} {altura}".strip(), objecion, uid))
+        if foto_nueva and foto_nueva.filename:
+            ejecutar("UPDATE locales SET foto=%s, foto_mime=%s WHERE id=%s",
+                     (foto_nueva.read(), foto_nueva.mimetype or "image/jpeg", uid))
 
-        with lock:
-            registro["nombre"] = nombre
-            registro["direccion"] = f"{calle} {altura}".strip()
-            registro["objecion"] = objecion
-
-            if foto and foto.filename:
-                filename = f"local_{uid}_{foto.filename}"
-                filepath = os.path.join(UPLOAD_FOLDER, filename)
-                foto.save(filepath)
-
-                foto_anterior = registro.get("filepath")
-                if foto_anterior and foto_anterior != filepath and os.path.exists(foto_anterior):
-                    try:
-                        os.remove(foto_anterior)
-                    except OSError:
-                        pass
-
-                registro["foto"] = filename
-                registro["filepath"] = filepath
-
-        guardar_estado()
         flash(f"✏️ Local N° {registro['numero']} actualizado correctamente.")
         return redirect(url_for('dashboard'))
 
     partes = registro["direccion"].rsplit(" ", 1)
-    if len(partes) == 2:
-        calle_actual, altura_actual = partes
-    else:
-        calle_actual, altura_actual = registro["direccion"], ""
-
+    calle_actual, altura_actual = (partes if len(partes) == 2 else (registro["direccion"], ""))
     return render_template_string(
         HTML_EDIT,
         registro=registro,
         calle_actual=calle_actual,
         altura_actual=altura_actual,
-        calles=obtener_calles_actualizadas(),
+        calles=calles_de_hoy(usuario),
         objeciones=OBJECIONES,
         objecion_random=OBJECION_RANDOM,
     )
@@ -1473,55 +1342,37 @@ def editar(uid):
 
 @app.route('/eliminar/<int:uid>', methods=['POST'])
 def eliminar(uid):
-    """Elimina un local de la lista (pendiente o ya enviado) y su foto."""
-    with lock:
-        registro = registros.pop(uid, None)
-
+    usuario = usuario_actual()
+    registro = obtener_local(uid, usuario)
     if not registro:
         flash("⚠️ No se encontró ese local.")
         return redirect(url_for('dashboard'))
 
-    try:
+    if scheduler.get_job(f"job_{uid}"):
         scheduler.remove_job(f"job_{uid}")
-    except JobLookupError:
-        pass
-
-    filepath = registro.get("filepath")
-    if filepath and os.path.exists(filepath):
-        try:
-            os.remove(filepath)
-        except OSError:
-            pass
+    ejecutar("DELETE FROM locales WHERE id=%s", (uid,))
+    log("ELIMINAR", f"🗑️ Local id={uid} (N° {registro['numero']}) eliminado de la BD")
 
     if registro["estado"] == "pendiente":
-        recalcular_horarios_pendientes()
+        recalcular_horarios_pendientes(usuario)
 
-    guardar_estado()
     flash(f"🗑️ Local N° {registro['numero']} eliminado.")
     return redirect(url_for('dashboard'))
 
 
 @app.route('/ajustar_hora/<int:uid>', methods=['POST'])
 def ajustar_hora(uid):
-    """
-    Fija manualmente el horario de envío de un local pendiente. A partir de
-    ahí queda excluido del reparto automático hasta que se envíe o se lo
-    vuelva a poner en automático.
-    """
-    with lock:
-        registro = registros.get(uid)
-
+    usuario = usuario_actual()
+    registro = obtener_local(uid, usuario)
     if not registro:
         flash("⚠️ No se encontró ese local.")
         return redirect(url_for('dashboard'))
-
     if registro["estado"] == "enviado":
         flash(f"ℹ️ El Local N° {registro['numero']} ya fue enviado, no se puede reprogramar.")
         return redirect(url_for('dashboard'))
 
-    nueva_hora_str = request.form.get('nueva_hora', '').strip()
     try:
-        hh, mm = map(int, nueva_hora_str.split(':')[:2])
+        hh, mm = map(int, request.form.get('nueva_hora', '').strip().split(':')[:2])
         hora_elegida = dtime(hh, mm)
     except (ValueError, AttributeError):
         flash("⚠️ Formato de hora inválido.")
@@ -1529,28 +1380,15 @@ def ajustar_hora(uid):
 
     ahora = datetime.now(ARG_TZ)
     nueva_dt = ARG_TZ.localize(datetime.combine(ahora.date(), hora_elegida))
-
     if nueva_dt < ahora + timedelta(minutes=INTERVALO_MINIMO_MINUTOS):
         flash(f"⚠️ La hora tiene que ser al menos {INTERVALO_MINIMO_MINUTOS} minutos después de ahora.")
         return redirect(url_for('dashboard'))
 
-    job_id = f"job_{uid}"
-    try:
-        scheduler.reschedule_job(job_id, trigger='date', run_date=nueva_dt)
-    except JobLookupError:
-        scheduler.add_job(
-            func=enviar_reporte_telegram, trigger='date', run_date=nueva_dt, id=job_id,
-            args=[uid, registro["nombre"], registro["direccion"],
-                  registro["filepath"], registro["objecion"]]
-        )
-
-    with lock:
-        registro["hora_programada"] = nueva_dt.strftime("%H:%M:%S")
-        registro["hora_programada_iso"] = nueva_dt.isoformat()
-        registro["hora_manual"] = True
-
-    recalcular_horarios_pendientes()
-    guardar_estado()
+    log("HORARIOS", f"🔒 Hora manual para local id={uid}: {nueva_dt.strftime('%H:%M')}")
+    ejecutar("UPDATE locales SET hora_programada=%s, hora_programada_iso=%s, hora_manual=1 WHERE id=%s",
+             (nueva_dt.strftime("%H:%M:%S"), nueva_dt.isoformat(), uid))
+    _agendar(uid, nueva_dt)
+    recalcular_horarios_pendientes(usuario)
 
     flash(f"🕒 Hora del Local N° {registro['numero']} fijada manualmente a las {nueva_dt.strftime('%H:%M')}.")
     return redirect(url_for('dashboard'))
@@ -1558,50 +1396,50 @@ def ajustar_hora(uid):
 
 @app.route('/auto_hora/<int:uid>', methods=['POST'])
 def auto_hora(uid):
-    """Devuelve un local con hora fijada manualmente al reparto automático."""
-    with lock:
-        registro = registros.get(uid)
-
+    usuario = usuario_actual()
+    registro = obtener_local(uid, usuario)
     if not registro:
         flash("⚠️ No se encontró ese local.")
         return redirect(url_for('dashboard'))
-
     if registro["estado"] == "enviado":
         flash(f"ℹ️ El Local N° {registro['numero']} ya fue enviado.")
         return redirect(url_for('dashboard'))
 
-    with lock:
-        registro["hora_manual"] = False
-
-    recalcular_horarios_pendientes()
-    guardar_estado()
-
+    log("HORARIOS", f"🔄 Local id={uid} vuelve a modo automático")
+    ejecutar("UPDATE locales SET hora_manual=0 WHERE id=%s", (uid,))
+    recalcular_horarios_pendientes(usuario)
     flash(f"🔄 Local N° {registro['numero']} vuelve al reparto automático.")
     return redirect(url_for('dashboard'))
 
 
 @app.route('/api/objeciones')
 def api_objeciones():
-    """Lista de objeciones disponibles, en formato JSON."""
     return jsonify(OBJECIONES)
 
 
-@app.route('/api/datos')
-def api_datos():
-    """Historial completo en JSON (lo mismo que se espeja en localStorage)."""
-    return app.response_class(datos_para_cache(), mimetype='application/json')
+@app.errorhandler(Exception)
+def error_global(e):
+    """Cualquier excepción no capturada se imprime completa en la terminal."""
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        return e
+    log("ERROR", f"💥 Excepción en {request.method} {request.path}: {e!r}")
+    log("ERROR", traceback.format_exc())
+    return "Error interno. Revisá la consola del servidor.", 500
 
 
-@app.route('/uploads/<path:filename>')
-def uploaded_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
-
-
-cargar_estado()
+# ============================================================================
+# ARRANQUE
+# ============================================================================
+init_db()
 reprogramar_jobs_pendientes()
 
-
 if __name__ == '__main__':
-    # use_reloader=False: con el reloader, Flask levanta 2 procesos y se
-    # duplicarían los envíos programados del scheduler.
-    app.run(debug=True, port=5000, use_reloader=False)
+    # python app.py crear_usuario correo@ejemplo.com miusuario micontraseña
+    if len(sys.argv) == 5 and sys.argv[1] == "crear_usuario":
+        crear_usuario(sys.argv[2], sys.argv[3], sys.argv[4])
+        log("USUARIOS", f"✅ Usuario '{sys.argv[3]}' creado.")
+        sys.exit(0)
+
+    log("ARRANQUE", "🌐 Servidor listo")
+    app.run(debug=False, port=int(os.environ.get("PORT", 5000)), use_reloader=False)
