@@ -465,34 +465,108 @@ HTML_LOGIN = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iniciar sesión</title>
-    <style>""" + "%%BASE_CSS%%" + """
+    <style>%%BASE_CSS%%
+
+        body.login-body{
+            min-height:100vh; display:flex; align-items:center; justify-content:center;
+            padding:24px 16px;
+        }
+        .login-box{ width:100%; max-width:400px; }
+
+        .login-head{ text-align:center; margin-bottom:22px; }
+        .login-logo{
+            width:56px; height:56px; margin:0 auto 14px; border-radius:16px;
+            background:var(--brand-100); color:var(--brand-600);
+            display:flex; align-items:center; justify-content:center; font-size:26px;
+            border:1px solid #cfe5ee; box-shadow:var(--shadow-card);
+        }
+        .login-head h2{ font-size:22px; }
+        .login-sub{ font-size:13.5px; color:var(--ink-600); margin-top:6px; }
+
+        .login-card{ padding:24px 22px; }
+
+        .alert-error{
+            background:var(--red-100); color:var(--red-700); border:1px solid #efc7c2;
+            padding:11px 14px; margin-bottom:16px; border-radius:var(--radius-sm);
+            font-size:13.5px; font-weight:500;
+        }
+
+        .input-wrap{ position:relative; }
+        .input-wrap input{ padding-right:44px; }
+        .toggle-pass{
+            position:absolute; right:6px; top:50%; transform:translateY(-50%);
+            width:34px; height:34px; border:none; background:none; cursor:pointer;
+            border-radius:8px; font-size:16px; color:var(--ink-600);
+            display:flex; align-items:center; justify-content:center;
+        }
+        .toggle-pass:hover{ background:var(--paper); }
+
+        .btn-primary:disabled{ opacity:.7; cursor:wait; }
+        .login-foot{ text-align:center; font-size:11.5px; color:var(--ink-300); margin-top:18px; }
     </style>
 </head>
-<body>
-<div class="page" style="margin-top:8vh;">
-    <div class="topbar"><h2>🔐 Iniciar sesión</h2></div>
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}{% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}{% endif %}
-    {% endwith %}
-    <div class="card">
-        <form method="POST">
+<body class="login-body">
+<div class="login-box">
+    <div class="login-head">
+        <div class="login-logo">📍</div>
+        <h2>Iniciar sesión</h2>
+        <div class="login-sub">Ingresá para registrar y enviar tus locales</div>
+    </div>
+
+    <div class="card login-card">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}{% for message in messages %}<div class="alert-error">{{ message }}</div>{% endfor %}{% endif %}
+        {% endwith %}
+
+        <form method="POST" id="loginForm">
             <div class="field">
-                <label>Usuario o email</label>
-                <input type="text" name="identificador" required autofocus autocomplete="username">
+                <label for="identificador">Usuario o email</label>
+                <input type="text" id="identificador" name="identificador" required autofocus
+                       autocomplete="username" placeholder="Ej: tuusuario">
             </div>
+
             <div class="field">
-                <label>Contraseña</label>
-                <input type="password" name="password" required autocomplete="current-password"
-                       style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:14px;">
+                <label for="password">Contraseña</label>
+                <div class="input-wrap">
+                    <input type="password" id="password" name="password" required
+                           autocomplete="current-password" placeholder="••••••••">
+                    <button type="button" class="toggle-pass" id="togglePass"
+                            aria-label="Mostrar u ocultar contraseña" onclick="verPassword()">👁️</button>
+                </div>
             </div>
-            <button type="submit" class="btn-primary">Entrar</button>
+
+            <button type="submit" class="btn-primary" id="btnEntrar">Entrar</button>
         </form>
     </div>
+
+    <div class="login-foot">Acceso restringido</div>
 </div>
+
+<script>
+    function verPassword() {
+        const input = document.getElementById('password');
+        const btn = document.getElementById('togglePass');
+        const oculto = input.type === 'password';
+        input.type = oculto ? 'text' : 'password';
+        btn.textContent = oculto ? '🙈' : '👁️';
+    }
+
+    // Evita el doble envío (en tu log aparecía POST /login dos veces)
+    const form = document.getElementById('loginForm');
+    const btn = document.getElementById('btnEntrar');
+    form.addEventListener('submit', function () {
+        btn.disabled = true;
+        btn.textContent = 'Entrando...';
+    });
+    // Si el usuario vuelve con el botón "atrás", se rehabilita el botón
+    window.addEventListener('pageshow', function () {
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+    });
+</script>
 </body>
 </html>
 """
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
