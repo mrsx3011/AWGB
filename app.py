@@ -232,10 +232,17 @@ def recalcular_horarios_pendientes():
 
     Para que no quede algo demasiado robótico (siempre el mismo intervalo
     exacto), a los horarios intermedios se les agrega una variación
-    aleatoria de +/- MARGEN_JITTER_MINUTOS. El primero (anclado a "ahora")
-    y el último (siempre 15:55) no llevan variación. Pase lo que pase,
-    nunca puede haber menos de INTERVALO_MINIMO_MINUTOS entre un local y
-    el siguiente.
+    aleatoria de +/- MARGEN_JITTER_MINUTOS. El primero y el último
+    (siempre 15:55) no llevan variación.
+
+    IMPORTANTE sobre INTERVALO_MINIMO_MINUTOS (2 min): es solamente un
+    PISO de seguridad, para que nunca salgan dos locales casi pegados.
+    NO es el ritmo de envío. El ritmo siempre se calcula repartiendo de
+    forma proporcional el tiempo que queda entre ahora y las 15:55 entre
+    todos los pendientes, así se cubre la mayor parte posible de la
+    ventana horaria. Los 2 minutos sólo entran en juego si quedan tantos
+    locales y tan poco tiempo que el reparto proporcional daría menos que
+    eso.
 
     Los locales cuya hora fue fijada a mano (hora_manual = True, vía
     /ajustar_hora) quedan afuera de este reparto automático.
@@ -258,15 +265,32 @@ def recalcular_horarios_pendientes():
     if n == 0:
         return
 
-    # Punto de partida del cálculo: nunca antes de "ahora". Si el día
-    # todavía no arrancó (antes de las 10:00), el primer envío posible
-    # es 10:18.
+    fin_calculo = cierre
+
+    # ------------------------------------------------------------------
+    # Punto de partida del cálculo.
+    #
+    # El primer pendiente NO se ancla a "ahora + 2 minutos": ese era el
+    # error que hacía que, al enviarse un local, el siguiente saltara a
+    # 2 minutos y se comiera toda la ventana horaria. Los 2 minutos son
+    # sólo un piso de seguridad (que nunca salgan dos locales casi
+    # pegados), no el ritmo de envío.
+    #
+    # El hueco inicial es proporcional: se calcula cuánto tiempo queda
+    # hasta las 15:55 y se divide por la cantidad de pendientes, de modo
+    # que el espacio entre "ahora" y el primer envío sea del mismo orden
+    # que el espacio entre un local y el siguiente. Ese hueco se limita
+    # entre 2 y 18 minutos.
+    # ------------------------------------------------------------------
     if ahora < apertura:
+        # El día todavía no arrancó: el primero sale 10:18 como siempre.
         inicio_calculo = apertura + timedelta(minutes=BUFFER_INICIAL_MINUTOS)
     else:
-        inicio_calculo = ahora + timedelta(minutes=INTERVALO_MINIMO_MINUTOS)
-
-    fin_calculo = cierre
+        restante_seg = max((fin_calculo - ahora).total_seconds(), 0)
+        paso_natural_min = (restante_seg / 60.0) / n
+        offset_min = max(INTERVALO_MINIMO_MINUTOS,
+                         min(BUFFER_INICIAL_MINUTOS, paso_natural_min))
+        inicio_calculo = ahora + timedelta(minutes=offset_min)
 
     # Caso límite: si ya pasamos (o estamos muy cerca de) las 15:55,
     # igual garantizamos el mínimo de 2 minutos entre locales y los
@@ -277,22 +301,28 @@ def recalcular_horarios_pendientes():
         )
 
     if n == 1:
-        horarios = [inicio_calculo]
+        # Si queda un solo pendiente, es el ÚLTIMO del día: va a las 15:55.
+        # (Antes se lo mandaba a "ahora + 2 min", que era el bug principal.)
+        horarios = [fin_calculo]
     else:
         total_segundos = (fin_calculo - inicio_calculo).total_seconds()
         paso = total_segundos / (n - 1)
         horarios = [inicio_calculo + timedelta(seconds=paso * i) for i in range(n)]
 
-        # Jitter en los horarios intermedios (no en el primero ni en el último).
-        jitter_seg = MARGEN_JITTER_MINUTOS * 60
+        # Jitter en los horarios intermedios (no en el primero ni en el
+        # último). Se limita al 40% del paso: si hay muchos locales y el
+        # paso es chico, un margen fijo de 20 min los amontonaría.
+        jitter_seg = min(MARGEN_JITTER_MINUTOS * 60, paso * 0.4)
         for i in range(1, n - 1):
             horarios[i] += timedelta(seconds=random.uniform(-jitter_seg, jitter_seg))
 
         horarios[-1] = fin_calculo  # el último SIEMPRE a las 15:55 (o al cierre calculado)
 
-        # Reordenar (el jitter puede desordenar) y garantizar el mínimo
-        # de INTERVALO_MINIMO_MINUTOS entre locales consecutivos.
+        # Reordenar (el jitter puede desordenar), no dejar ninguno antes
+        # del inicio válido, y garantizar el mínimo de
+        # INTERVALO_MINIMO_MINUTOS entre locales consecutivos.
         horarios.sort()
+        horarios = [max(h, inicio_calculo) for h in horarios]
         for i in range(1, n):
             minimo = horarios[i - 1] + timedelta(minutes=INTERVALO_MINIMO_MINUTOS)
             if horarios[i] < minimo:
