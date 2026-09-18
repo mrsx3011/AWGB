@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import threading
@@ -19,8 +20,12 @@ app.secret_key = "admin123"
 # Configuración de Telegram y archivos
 TELEGRAM_TOKEN = "8736941358:AAG8aDuoEUkxNULlP2iewoJrcBM_VF0_fEk"
 CHAT_ID = "6060692704"
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Archivo donde se persiste TODO el historial (sobrevive reinicios del server)
+DATA_FILE = os.path.join(BASE_DIR, 'datos.json')
 
 # Zona horaria de Argentina
 ARG_TZ = pytz.timezone('America/Argentina/Buenos_Aires')
@@ -52,6 +57,21 @@ OBJECIONES = [
     "No estan interesados.",
 ]
 
+# Nombres en español para armar fechas del estilo "Jueves 19 de Septiembre"
+DIAS_ES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+MESES_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+
+
+def fecha_larga(fecha_iso):
+    """Convierte '2026-09-19' en 'Jueves 19 de Septiembre'."""
+    try:
+        d = datetime.strptime(fecha_iso, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return fecha_iso or ""
+    return f"{DIAS_ES[d.weekday()]} {d.day} de {MESES_ES[d.month - 1]}"
+
+
 # Estado en memoria: almacena la fecha del 'día actual' y las calles registradas
 estado_calles = {
     "fecha": datetime.now(ARG_TZ).strftime("%Y-%m-%d"),
@@ -61,29 +81,119 @@ estado_calles = {
 # Lock para proteger el estado compartido entre requests y el scheduler
 lock = threading.Lock()
 
-local_counter = 1
+# uid_counter: identificador interno único que NUNCA se reinicia (clave del dict).
+# El "numero" que ve el usuario sí se reinicia todos los días (Local N° 1, 2, 3...).
+uid_counter = 1
 
-# Registro de todos los locales enviados/pendientes, para el dashboard
-# clave: numero de local -> dict con info
+# Historial COMPLETO de locales (de todos los días).
+# clave: uid interno -> dict con la info del local (incluye "fecha" y "numero")
 registros = {}
 
 scheduler = BackgroundScheduler()
 scheduler.start()
 
 
+# ============================================================================
+# PERSISTENCIA — todo se guarda en disco para que sobreviva recargas y caídas
+# ============================================================================
+def guardar_estado():
+    """
+    Vuelca el historial completo a datos.json. Se llama después de cada
+    cambio (alta, edición, envío, borrado, reprogramación), así que si la
+    página se recarga o el servidor se reinicia, no se pierde nada.
+    """
+    try:
+        with lock:
+            data = {
+                "uid_counter": uid_counter,
+                "registros": list(registros.values()),
+                "calles": {
+                    "fecha": estado_calles["fecha"],
+                    "lista": sorted(list(estado_calles["calles"])),
+                },
+            }
+        tmp = DATA_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, DATA_FILE)   # escritura atómica: nunca queda a medias
+    except OSError as e:
+        print(f"[persistencia] No se pudo guardar: {e}")
+
+
+def cargar_estado():
+    """Levanta el historial de datos.json al arrancar el servidor."""
+    global uid_counter
+    if not os.path.exists(DATA_FILE):
+        return
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as e:
+        print(f"[persistencia] No se pudo leer {DATA_FILE}: {e}")
+        return
+
+    with lock:
+        uid_counter = data.get("uid_counter", 1)
+        for r in data.get("registros", []):
+            if "uid" in r:
+                registros[r["uid"]] = r
+        calles_guardadas = data.get("calles", {})
+        estado_calles["fecha"] = calles_guardadas.get(
+            "fecha", datetime.now(ARG_TZ).strftime("%Y-%m-%d"))
+        estado_calles["calles"] = set(calles_guardadas.get("lista", []))
+
+    print(f"[persistencia] {len(registros)} locales cargados desde disco.")
+
+
+def reprogramar_jobs_pendientes():
+    """
+    Después de un reinicio, los jobs del scheduler se pierden (viven en
+    memoria). Esta función los vuelve a crear para los locales de HOY que
+    quedaron pendientes.
+    """
+    hoy = datetime.now(ARG_TZ).strftime("%Y-%m-%d")
+    ahora = datetime.now(ARG_TZ)
+
+    with lock:
+        pendientes_hoy = [r for r in registros.values()
+                          if r["estado"] == "pendiente" and r.get("fecha") == hoy]
+
+    for r in pendientes_hoy:
+        if not r.get("hora_manual"):
+            continue  # los automáticos los reagenda recalcular_horarios_pendientes()
+        try:
+            run_date = datetime.fromisoformat(r["hora_programada_iso"])
+        except (ValueError, KeyError):
+            continue
+        if run_date <= ahora:
+            run_date = ahora + timedelta(minutes=INTERVALO_MINIMO_MINUTOS)
+        try:
+            scheduler.add_job(
+                func=enviar_reporte_telegram, trigger='date', run_date=run_date,
+                id=f"job_{r['uid']}", replace_existing=True,
+                args=[r["uid"], r["nombre"], r["direccion"], r["filepath"], r["objecion"]]
+            )
+        except Exception as e:
+            print(f"[scheduler] No se pudo reagendar {r['uid']}: {e}")
+
+    recalcular_horarios_pendientes()
+
+
 def verificar_dia():
     """
-    Si cambió el día (hora de Argentina), reinicia todo el estado diario:
-    calles registradas, contador de locales y el propio dashboard.
+    Si cambió el día (hora de Argentina), limpia las calles sugeridas.
+    OJO: el historial de locales NO se borra nunca — queda disponible en la
+    sección "Lista de locales", agrupado por fecha.
     """
-    global local_counter
     hoy = datetime.now(ARG_TZ).strftime("%Y-%m-%d")
+    cambio = False
     with lock:
         if estado_calles["fecha"] != hoy:
             estado_calles["fecha"] = hoy
             estado_calles["calles"].clear()
-            registros.clear()
-            local_counter = 1
+            cambio = True
+    if cambio:
+        guardar_estado()
 
 
 def obtener_calles_actualizadas():
@@ -93,17 +203,27 @@ def obtener_calles_actualizadas():
         return sorted(list(estado_calles["calles"]))
 
 
-def contar_locales_hoy():
+def registros_de_hoy():
+    hoy = datetime.now(ARG_TZ).strftime("%Y-%m-%d")
     with lock:
-        return len(registros)
+        return [r for r in registros.values() if r.get("fecha") == hoy]
+
+
+def contar_locales_hoy():
+    return len(registros_de_hoy())
+
+
+def proximo_numero_del_dia():
+    """El N° de local que ve el usuario se reinicia cada día: 1, 2, 3..."""
+    return len(registros_de_hoy()) + 1
 
 
 def recalcular_horarios_pendientes():
     """
-    Recalcula y reprograma el horario de envío de TODOS los locales
-    pendientes (no enviados todavía), repartiéndolos de forma equitativa
-    entre el momento actual (o las 10:18 si el día recién está arrancando)
-    y las 15:55, que es siempre el límite para el último local del día.
+    Recalcula y reprograma el horario de envío de TODOS los locales de HOY
+    que estén pendientes, repartiéndolos de forma equitativa entre el
+    momento actual (o las 10:18 si el día recién está arrancando) y las
+    15:55, que es siempre el límite para el último local del día.
 
     Cada vez que se agrega un nuevo local, se elimina uno o se envía uno
     manualmente, hay que volver a llamar a esta función para que los
@@ -118,20 +238,20 @@ def recalcular_horarios_pendientes():
     el siguiente.
 
     Los locales cuya hora fue fijada a mano (hora_manual = True, vía
-    /ajustar_hora) quedan afuera de este reparto automático: conservan el
-    horario que el usuario eligió y no se tocan hasta que se envíen o se
-    vuelvan a poner en automático.
+    /ajustar_hora) quedan afuera de este reparto automático.
     """
     ahora = datetime.now(ARG_TZ)
-    hoy = ahora.date()
-    apertura = ARG_TZ.localize(datetime.combine(hoy, HORA_APERTURA))
-    cierre = ARG_TZ.localize(datetime.combine(hoy, HORA_CIERRE))
+    hoy_str = ahora.strftime("%Y-%m-%d")
+    apertura = ARG_TZ.localize(datetime.combine(ahora.date(), HORA_APERTURA))
+    cierre = ARG_TZ.localize(datetime.combine(ahora.date(), HORA_CIERRE))
 
     with lock:
         pendientes = sorted(
             (r for r in registros.values()
-             if r["estado"] == "pendiente" and not r.get("hora_manual")),
-            key=lambda r: r["numero"]
+             if r["estado"] == "pendiente"
+             and r.get("fecha") == hoy_str
+             and not r.get("hora_manual")),
+            key=lambda r: r["uid"]
         )
 
     n = len(pendientes)
@@ -163,12 +283,10 @@ def recalcular_horarios_pendientes():
         paso = total_segundos / (n - 1)
         horarios = [inicio_calculo + timedelta(seconds=paso * i) for i in range(n)]
 
-        # Jitter en los horarios intermedios (no en el primero ni en el
-        # último).
+        # Jitter en los horarios intermedios (no en el primero ni en el último).
         jitter_seg = MARGEN_JITTER_MINUTOS * 60
         for i in range(1, n - 1):
-            offset = random.uniform(-jitter_seg, jitter_seg)
-            horarios[i] += timedelta(seconds=offset)
+            horarios[i] += timedelta(seconds=random.uniform(-jitter_seg, jitter_seg))
 
         horarios[-1] = fin_calculo  # el último SIEMPRE a las 15:55 (o al cierre calculado)
 
@@ -183,11 +301,11 @@ def recalcular_horarios_pendientes():
     # Reprogramar cada job y actualizar el registro correspondiente.
     with lock:
         for registro, nuevo_horario in zip(pendientes, horarios):
-            num_local = registro["numero"]
+            uid = registro["uid"]
             registro["hora_programada"] = nuevo_horario.strftime("%H:%M:%S")
             registro["hora_programada_iso"] = nuevo_horario.isoformat()
 
-            job_id = f"job_{num_local}"
+            job_id = f"job_{uid}"
             try:
                 scheduler.reschedule_job(job_id, trigger='date', run_date=nuevo_horario)
             except JobLookupError:
@@ -196,67 +314,73 @@ def recalcular_horarios_pendientes():
                     trigger='date',
                     run_date=nuevo_horario,
                     id=job_id,
-                    args=[num_local, registro["nombre"], registro["direccion"],
+                    args=[uid, registro["nombre"], registro["direccion"],
                           registro["filepath"], registro["objecion"]]
                 )
 
+    guardar_estado()
 
-def enviar_reporte_telegram(num_local, nombre_local, direccion, filepath, objecion):
+
+def _post_telegram_texto(texto):
+    requests.post(
+        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+        json={"chat_id": CHAT_ID, "text": texto, "parse_mode": "Markdown"}
+    )
+
+
+def enviar_reporte_telegram(uid, nombre_local, direccion, filepath, objecion,
+                            encabezado=None, numero_mostrado=None):
     """
-    Envía el reporte del local por Telegram, pero DESGLOSADO en varios
-    mensajes en vez de uno solo:
+    Envía el reporte del local por Telegram, DESGLOSADO en varios mensajes:
+      0) (opcional) un encabezado, usado por el re-envío: "R.E FECHA: ..."
       1) la foto del local
       2) el nombre del local
       3) la dirección (calle + altura)
       4) la objeción registrada (o aviso de que no hubo objeción)
     """
-    url_text = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     url_photo = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
 
+    # 0) Encabezado del re-envío (va arriba de todo)
+    if encabezado:
+        _post_telegram_texto(encabezado)
+
+    if numero_mostrado is None:
+        with lock:
+            reg = registros.get(uid)
+            numero_mostrado = reg["numero"] if reg else uid
+
     # 1) Foto del local
-    if os.path.exists(filepath):
+    if filepath and os.path.exists(filepath):
         with open(filepath, 'rb') as photo_file:
             requests.post(
                 url_photo,
-                data={"chat_id": CHAT_ID, "caption": f"📌 Local N° {num_local}"},
+                data={"chat_id": CHAT_ID, "caption": f"📌 Local N° {numero_mostrado}"},
                 files={"photo": photo_file}
             )
 
     # 2) Nombre del local
-    requests.post(url_text, json={
-        "chat_id": CHAT_ID,
-        "text": f"{nombre_local}",
-        "parse_mode": "Markdown"
-    })
+    _post_telegram_texto(f"{nombre_local}")
 
     # 3) Dirección y altura
-    requests.post(url_text, json={
-        "chat_id": CHAT_ID,
-        "text": f"{direccion}",
-        "parse_mode": "Markdown"
-    })
+    _post_telegram_texto(f"{direccion}")
 
     # 4) Objeción
-    texto_objecion = objecion if objecion else "Sin objeción registrada."
-    requests.post(url_text, json={
-        "chat_id": CHAT_ID,
-        "text": f" {texto_objecion}",
-        "parse_mode": "Markdown"
-    })
+    _post_telegram_texto(f" {objecion if objecion else 'Sin objeción registrada.'}")
 
-    # Actualizar estado en el registro para que el dashboard lo refleje
-    with lock:
-        if num_local in registros:
-            registros[num_local]["estado"] = "enviado"
-            registros[num_local]["hora_envio_real"] = datetime.now(ARG_TZ).strftime("%H:%M:%S")
-
-    # Como este local ya salió de la lista de "pendientes", hay que
-    # repartir de nuevo el tiempo restante entre los que quedan.
-    recalcular_horarios_pendientes()
+    # Si es un envío normal (no un re-envío), marcar como enviado.
+    if encabezado is None:
+        with lock:
+            if uid in registros:
+                registros[uid]["estado"] = "enviado"
+                registros[uid]["hora_envio_real"] = datetime.now(ARG_TZ).strftime("%H:%M:%S")
+        # Como este local ya salió de la lista de "pendientes", hay que
+        # repartir de nuevo el tiempo restante entre los que quedan.
+        recalcular_horarios_pendientes()
+        guardar_estado()
 
 
 # ============================================================================
-# DISEÑO — tokens y estilos base compartidos por las 3 pantallas
+# DISEÑO — tokens y estilos base compartidos por las pantallas
 # ============================================================================
 BASE_CSS = """
 :root{
@@ -282,8 +406,9 @@ h2{ font-size:19px; font-weight:700; letter-spacing:-0.01em; margin:0; color:var
 .page{ max-width:560px; margin:0 auto; }
 .page-wide{ max-width:1140px; margin:0 auto; }
 
-.topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:10px; flex-wrap:wrap; }
-.topbar a{ text-decoration:none; font-weight:600; font-size:13.5px; display:inline-flex; align-items:center; gap:6px; }
+.topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap; }
+.navlinks{ display:flex; gap:14px; flex-wrap:wrap; }
+.navlinks a{ text-decoration:none; font-weight:600; font-size:13.5px; display:inline-flex; align-items:center; gap:6px; }
 
 .contador-wrap{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md);
     padding:13px 16px; margin-bottom:18px; box-shadow:var(--shadow-card); }
@@ -316,7 +441,21 @@ button{ font-family:inherit; }
     cursor:pointer; font-size:14.5px; font-weight:600; width:100%; }
 .btn-primary:hover{ background:var(--brand-700); }
 
-/* Preview de foto + lightbox (compartido por las 3 pantallas) */
+.btn-pill{ display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:99px;
+    font-size:12.5px; font-weight:600; border:1px solid transparent; cursor:pointer; white-space:nowrap;
+    transition:background .15s ease, transform .05s ease; line-height:1; font-family:inherit; text-decoration:none; }
+.btn-pill:active{ transform:scale(.96); }
+
+.badge{ display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:99px;
+    font-size:11.5px; font-weight:700; white-space:nowrap; }
+.badge-pendiente{ background:var(--amber-100); color:var(--amber-700); }
+.badge-enviado{ background:var(--green-100); color:var(--green-700); }
+.badge-manual{ background:var(--brand-100); color:var(--brand-700); font-size:10px; padding:2px 7px; margin-left:5px; }
+
+.empty{ text-align:center; padding:52px 20px; color:var(--ink-600); background:var(--surface);
+    border:1px dashed var(--line); border-radius:var(--radius-lg); }
+
+/* Preview de foto + lightbox */
 .preview-box{ display:none; margin-top:10px; }
 .preview-thumb, .foto-actual{ display:block; max-width:200px; max-height:200px; border-radius:var(--radius-md);
     border:1px solid var(--line); cursor:zoom-in; object-fit:cover; }
@@ -330,6 +469,9 @@ button{ font-family:inherit; }
 .zoom-close{ position:fixed; top:16px; right:18px; color:#fff; font-size:22px; cursor:pointer; z-index:1001;
     width:36px; height:36px; display:flex; align-items:center; justify-content:center;
     background:rgba(255,255,255,.14); border-radius:50%; line-height:1; }
+
+/* Aviso de copia local (localStorage) */
+.cache-note{ font-size:11.5px; color:var(--ink-300); text-align:center; margin-top:18px; }
 """
 
 ZOOM_JS = """
@@ -359,6 +501,33 @@ ZOOM_HTML = """
     </div>
 """
 
+# JS que guarda una copia de todos los datos en el localStorage del navegador
+# en cada carga de página. Es un respaldo de lectura: si el servidor no
+# responde, la sección "Lista de locales" igual puede mostrar la última copia.
+CACHE_JS = """
+const CACHE_KEY = 'locales_backup_v1';
+
+function guardarCacheLocal(datos) {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+            guardado: new Date().toISOString(),
+            datos: datos
+        }));
+    } catch (e) {
+        console.warn('No se pudo guardar en localStorage:', e);
+    }
+}
+
+function leerCacheLocal() {
+    try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+        return null;
+    }
+}
+"""
+
 
 HTML_FORM = """
 <!DOCTYPE html>
@@ -374,7 +543,10 @@ HTML_FORM = """
 <div class="page">
     <div class="topbar">
         <h2>Registro de local</h2>
-        <a href="{{ url_for('dashboard') }}">📊 Ver dashboard</a>
+        <div class="navlinks">
+            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+            <a href="{{ url_for('lista') }}">🗂️ Lista</a>
+        </div>
     </div>
 
     <div class="contador-wrap">
@@ -440,9 +612,15 @@ HTML_FORM = """
             <button type="submit" class="btn-primary">Enviar registro</button>
         </form>
     </div>
+
+    <div class="cache-note" id="cacheNote"></div>
 </div>
 """ + ZOOM_HTML + """
+    <script id="datos-json" type="application/json">{{ datos_json | safe }}</script>
     <script>
+        """ + CACHE_JS + """
+        """ + ZOOM_JS + """
+
         function mostrarPreview(event) {
             const file = event.target.files[0];
             const box = document.getElementById('previewBox');
@@ -452,7 +630,20 @@ HTML_FORM = """
             reader.onload = function(e) { img.src = e.target.result; box.style.display = 'block'; };
             reader.readAsDataURL(file);
         }
-        """ + ZOOM_JS + """
+
+        // Guardar copia local de todo el historial en cada carga
+        (function () {
+            try {
+                const datos = JSON.parse(document.getElementById('datos-json').textContent);
+                guardarCacheLocal(datos);
+                const cache = leerCacheLocal();
+                if (cache) {
+                    const f = new Date(cache.guardado);
+                    document.getElementById('cacheNote').textContent =
+                        '💾 Copia local guardada: ' + f.toLocaleString('es-AR');
+                }
+            } catch (e) { console.warn(e); }
+        })();
     </script>
 </body>
 </html>
@@ -482,44 +673,21 @@ HTML_DASHBOARD = """
 
         .thumb{ width:42px; height:42px; object-fit:cover; border-radius:8px; border:1px solid var(--line);
             cursor:zoom-in; display:block; }
-
-        .badge{ display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:99px;
-            font-size:11.5px; font-weight:700; white-space:nowrap; }
-        .badge-pendiente{ background:var(--amber-100); color:var(--amber-700); }
-        .badge-enviado{ background:var(--green-100); color:var(--green-700); }
-        .badge-manual{ background:var(--brand-100); color:var(--brand-700); font-size:10px; padding:2px 7px; margin-left:5px; }
-
         .countdown{ font-size:11px; color:var(--ink-600); margin-top:2px; }
         .objecion-cell{ max-width:190px; font-size:12px; color:var(--ink-600); }
 
-        .empty{ text-align:center; padding:52px 20px; color:var(--ink-600); background:var(--surface);
-            border:1px dashed var(--line); border-radius:var(--radius-lg); }
-
-        /* ---------------------------------------------------------------
-           Columna de acciones: 3 grupos — Enviar / Conf / Manual-Auto
-           --------------------------------------------------------------- */
         .action-groups{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; position:relative; }
-
-        .btn-pill{ display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:99px;
-            font-size:12.5px; font-weight:600; border:1px solid transparent; cursor:pointer; white-space:nowrap;
-            transition:background .15s ease, transform .05s ease; line-height:1; font-family:inherit; }
-        .btn-pill:active{ transform:scale(.96); }
-
         .btn-enviar{ background:var(--brand-600); color:#fff; }
         .btn-enviar:hover{ background:var(--brand-700); }
         .chip-enviado{ background:var(--green-100); color:var(--green-700); cursor:default; }
-
         .btn-conf{ background:var(--surface); color:var(--ink-700); border-color:var(--line); }
         .btn-conf:hover{ background:var(--paper); }
         .btn-conf.activo{ background:var(--paper); border-color:var(--ink-300); }
-
         .btn-auto{ background:var(--surface); color:var(--ink-600); border-color:var(--line); }
         .btn-auto:hover{ background:var(--paper); }
         .btn-manual{ background:var(--amber-100); color:var(--amber-700); border-color:var(--amber-200); }
         .btn-manual:hover{ background:#F5DFB0; }
 
-        /* Panel del menú "Conf": controlado 100% por JS (no <details>) para
-           que funcione de forma predecible en cualquier navegador/mobile. */
         .conf-menu{ position:relative; display:inline-block; }
         .conf-panel{ display:none; position:absolute; right:0; top:calc(100% + 6px); background:var(--surface);
             border:1px solid var(--line); border-radius:var(--radius-md); box-shadow:0 10px 28px rgba(20,25,30,.16);
@@ -539,7 +707,6 @@ HTML_DASHBOARD = """
             color:#fff; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
         .conf-time-row button:hover{ background:var(--brand-700); }
 
-        /* Vista tipo tarjeta en pantallas chicas: cada fila se apila */
         @media (max-width: 760px){
             body{ padding:16px 10px 60px; }
             table, thead, tbody, tr{ display:block; width:100%; }
@@ -549,15 +716,13 @@ HTML_DASHBOARD = """
             td{ display:flex; justify-content:space-between; align-items:center; gap:12px;
                 border-bottom:1px dashed var(--line); padding:9px 10px; }
             tr td:last-child{ border-bottom:none; }
-            td::before{ content:attr(data-label); font-weight:600; color:var(--ink-600); font-size:11.5px;
-                flex-shrink:0; }
+            td::before{ content:attr(data-label); font-weight:600; color:var(--ink-600); font-size:11.5px; flex-shrink:0; }
             td.td-photo{ justify-content:flex-start; }
             td.td-photo::before{ content:''; }
             td.td-photo .thumb{ width:56px; height:56px; }
             td.td-actions{ display:block; }
             td.td-actions::before{ content:''; }
             td.td-actions .action-groups{ justify-content:flex-end; }
-            .conf-panel{ right:0; left:auto; }
         }
     </style>
 </head>
@@ -565,7 +730,10 @@ HTML_DASHBOARD = """
 <div class="page-wide">
     <div class="topbar">
         <h2>📊 Dashboard de locales</h2>
-        <a href="{{ url_for('index') }}">➕ Nuevo registro</a>
+        <div class="navlinks">
+            <a href="{{ url_for('index') }}">➕ Nuevo registro</a>
+            <a href="{{ url_for('lista') }}">🗂️ Lista de locales</a>
+        </div>
     </div>
 
     <div class="contador-wrap">
@@ -591,15 +759,8 @@ HTML_DASHBOARD = """
     <table>
         <thead>
             <tr>
-                <th>Foto</th>
-                <th>N° Local</th>
-                <th>Nombre</th>
-                <th>Dirección</th>
-                <th>Objeción</th>
-                <th>Registrado</th>
-                <th>Envío estimado</th>
-                <th>Estado</th>
-                <th>Acciones</th>
+                <th>Foto</th><th>N° Local</th><th>Nombre</th><th>Dirección</th><th>Objeción</th>
+                <th>Registrado</th><th>Envío estimado</th><th>Estado</th><th>Acciones</th>
             </tr>
         </thead>
         <tbody>
@@ -632,9 +793,9 @@ HTML_DASHBOARD = """
                 </td>
                 <td class="td-actions" data-label="Acciones">
                     <div class="action-groups">
-                        <!-- Grupo 1: Enviar (solo dispara el envío al bot) -->
+                        <!-- Grupo 1: Enviar -->
                         {% if r.estado == 'pendiente' %}
-                        <form method="POST" action="{{ url_for('enviar_ahora', num_local=r.numero) }}"
+                        <form method="POST" action="{{ url_for('enviar_ahora', uid=r.uid) }}"
                               onsubmit="return confirm('¿Enviar el Local N° {{ r.numero }} ahora mismo?');">
                             <button type="submit" class="btn-pill btn-enviar">📤 Enviar</button>
                         </form>
@@ -642,25 +803,25 @@ HTML_DASHBOARD = """
                         <span class="btn-pill chip-enviado">✅ Enviado</span>
                         {% endif %}
 
-                        <!-- Grupo 2: Conf (editar, ubicación, reprogramar, eliminar) -->
+                        <!-- Grupo 2: Conf -->
                         <div class="conf-menu">
-                            <button type="button" class="btn-pill btn-conf" id="conf-btn-{{ r.numero }}"
-                                    onclick="toggleConf(event, {{ r.numero }})">⚙️ Conf</button>
-                            <div class="conf-panel" id="conf-panel-{{ r.numero }}">
-                                <a class="conf-item" href="{{ url_for('editar', num_local=r.numero) }}">✏️ Editar datos</a>
+                            <button type="button" class="btn-pill btn-conf" id="conf-btn-{{ r.uid }}"
+                                    onclick="toggleConf(event, {{ r.uid }})">⚙️ Conf</button>
+                            <div class="conf-panel" id="conf-panel-{{ r.uid }}">
+                                <a class="conf-item" href="{{ url_for('editar', uid=r.uid) }}">✏️ Editar datos</a>
                                 <a class="conf-item" target="_blank" rel="noopener"
                                    href="https://www.google.com/maps/search/?api=1&query={{ r.direccion_url }}">📍 Ver ubicación</a>
                                 {% if r.estado == 'pendiente' %}
                                 <div class="conf-divider"></div>
                                 <div class="conf-label">Reprogramar envío</div>
-                                <form method="POST" action="{{ url_for('ajustar_hora', num_local=r.numero) }}" class="conf-time-row">
-                                    <input type="time" id="hora-input-{{ r.numero }}" name="nueva_hora"
+                                <form method="POST" action="{{ url_for('ajustar_hora', uid=r.uid) }}" class="conf-time-row">
+                                    <input type="time" id="hora-input-{{ r.uid }}" name="nueva_hora"
                                            value="{{ r.hora_programada[:5] }}" required>
                                     <button type="submit">Fijar</button>
                                 </form>
                                 {% endif %}
                                 <div class="conf-divider"></div>
-                                <form method="POST" action="{{ url_for('eliminar', num_local=r.numero) }}"
+                                <form method="POST" action="{{ url_for('eliminar', uid=r.uid) }}"
                                       onsubmit="return confirm('¿Eliminar el Local N° {{ r.numero }}? Esta acción no se puede deshacer.');">
                                     <button type="submit" class="conf-item danger">🗑️ Eliminar local</button>
                                 </form>
@@ -670,12 +831,12 @@ HTML_DASHBOARD = """
                         <!-- Grupo 3: Manual / Auto -->
                         {% if r.estado == 'pendiente' %}
                             {% if r.hora_manual %}
-                            <form method="POST" action="{{ url_for('auto_hora', num_local=r.numero) }}">
+                            <form method="POST" action="{{ url_for('auto_hora', uid=r.uid) }}">
                                 <button type="submit" class="btn-pill btn-manual" title="Volver al reparto automático">🔒 Manual</button>
                             </form>
                             {% else %}
                             <button type="button" class="btn-pill btn-auto" title="Fijar hora manual"
-                                    onclick="abrirConfParaHora({{ r.numero }})">🔄 Auto</button>
+                                    onclick="abrirConfParaHora({{ r.uid }})">🔄 Auto</button>
                             {% endif %}
                         {% endif %}
                     </div>
@@ -688,60 +849,40 @@ HTML_DASHBOARD = """
     {% else %}
         <div class="empty">Todavía no hay locales registrados hoy.</div>
     {% endif %}
+
+    <div class="cache-note" id="cacheNote"></div>
 </div>
 """ + ZOOM_HTML + """
+    <script id="datos-json" type="application/json">{{ datos_json | safe }}</script>
     <script>
+        """ + CACHE_JS + """
         """ + ZOOM_JS + """
 
-        // ------------------------------------------------------------------
-        // Menú "Conf": un solo panel abierto a la vez, controlado por clases.
-        // No depende de <details>, así que el click siempre funciona igual
-        // en cualquier navegador (incluído mobile).
-        // ------------------------------------------------------------------
         function cerrarTodosLosConf() {
-            document.querySelectorAll('.conf-panel.abierto').forEach(function (p) {
-                p.classList.remove('abierto');
-            });
-            document.querySelectorAll('.btn-conf.activo').forEach(function (b) {
-                b.classList.remove('activo');
-            });
+            document.querySelectorAll('.conf-panel.abierto').forEach(p => p.classList.remove('abierto'));
+            document.querySelectorAll('.btn-conf.activo').forEach(b => b.classList.remove('activo'));
         }
-
-        function toggleConf(event, numero) {
+        function toggleConf(event, uid) {
             event.stopPropagation();
-            const panel = document.getElementById('conf-panel-' + numero);
-            const boton = document.getElementById('conf-btn-' + numero);
-            const yaEstabaAbierto = panel.classList.contains('abierto');
+            const panel = document.getElementById('conf-panel-' + uid);
+            const boton = document.getElementById('conf-btn-' + uid);
+            const abierto = panel.classList.contains('abierto');
             cerrarTodosLosConf();
-            if (!yaEstabaAbierto) {
-                panel.classList.add('abierto');
-                boton.classList.add('activo');
-            }
+            if (!abierto) { panel.classList.add('abierto'); boton.classList.add('activo'); }
         }
-
-        // Botón "Auto": abre directamente el panel Conf de esa fila y pone
-        // el foco en el campo de hora, para fijar el horario manual en un paso.
-        function abrirConfParaHora(numero) {
+        function abrirConfParaHora(uid) {
             cerrarTodosLosConf();
-            const panel = document.getElementById('conf-panel-' + numero);
-            const boton = document.getElementById('conf-btn-' + numero);
+            const panel = document.getElementById('conf-panel-' + uid);
+            const boton = document.getElementById('conf-btn-' + uid);
             if (!panel) return;
             panel.classList.add('abierto');
             if (boton) boton.classList.add('activo');
-            const input = document.getElementById('hora-input-' + numero);
-            if (input) setTimeout(function () { input.focus(); }, 30);
+            const input = document.getElementById('hora-input-' + uid);
+            if (input) setTimeout(() => input.focus(), 30);
         }
+        document.addEventListener('click', e => { if (!e.target.closest('.conf-menu')) cerrarTodosLosConf(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarTodosLosConf(); });
 
-        // Cerrar el panel abierto si se hace click en cualquier otro lado.
-        document.addEventListener('click', function (e) {
-            if (!e.target.closest('.conf-menu')) cerrarTodosLosConf();
-        });
-        // Cerrar con Escape.
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') cerrarTodosLosConf();
-        });
-
-        // Cuenta regresiva en vivo para los locales pendientes
         function actualizarCountdowns() {
             document.querySelectorAll('.countdown').forEach(function(el) {
                 const target = new Date(el.dataset.target);
@@ -755,18 +896,206 @@ HTML_DASHBOARD = """
         setInterval(actualizarCountdowns, 1000);
         actualizarCountdowns();
 
-        // Refresco automático de la página cada 30s para traer datos nuevos,
-        // pero SOLO si no hay ningún menú "Conf" abierto en ese momento
-        // (si no, se le cerraba el menú a mitad de una acción).
+        // Refresco automático, pero sin interrumpir un menú Conf abierto
         setInterval(function () {
-            if (!document.querySelector('.conf-panel.abierto')) {
-                window.location.reload();
-            }
+            if (!document.querySelector('.conf-panel.abierto')) window.location.reload();
         }, 30000);
+
+        // Copia local de todos los datos
+        (function () {
+            try {
+                const datos = JSON.parse(document.getElementById('datos-json').textContent);
+                guardarCacheLocal(datos);
+                const cache = leerCacheLocal();
+                if (cache) {
+                    document.getElementById('cacheNote').textContent =
+                        '💾 Copia local guardada: ' + new Date(cache.guardado).toLocaleString('es-AR');
+                }
+            } catch (e) { console.warn(e); }
+        })();
     </script>
 </body>
 </html>
 """
+
+
+HTML_LISTA = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Locales</title>
+    <style>""" + BASE_CSS + """
+
+        .dia-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg);
+            box-shadow:var(--shadow-card); margin-bottom:12px; overflow:hidden; }
+
+        .dia-header{ display:flex; align-items:center; justify-content:space-between; gap:12px;
+            padding:15px 18px; cursor:pointer; user-select:none; background:var(--surface);
+            border:none; width:100%; font-family:inherit; text-align:left; }
+        .dia-header:hover{ background:#FAFBFB; }
+        .dia-titulo{ display:flex; align-items:center; gap:10px; }
+        .dia-nombre{ font-size:15px; font-weight:700; color:var(--ink-900); }
+        .dia-meta{ display:flex; align-items:center; gap:8px; }
+        .dia-count{ background:var(--paper); color:var(--ink-600); font-size:11.5px; font-weight:700;
+            padding:3px 10px; border-radius:99px; }
+        .flecha{ font-size:12px; color:var(--ink-600); transition:transform .22s ease; display:inline-block; }
+        .dia-card.abierto .flecha{ transform:rotate(180deg); }
+
+        .dia-body{ display:none; border-top:1px solid var(--line); padding:6px 14px 14px; }
+        .dia-card.abierto .dia-body{ display:block; }
+
+        .local-row{ display:flex; gap:14px; align-items:flex-start; padding:14px 4px;
+            border-bottom:1px solid var(--line); }
+        .local-row:last-child{ border-bottom:none; }
+        .local-foto{ width:62px; height:62px; object-fit:cover; border-radius:10px; border:1px solid var(--line);
+            cursor:zoom-in; flex-shrink:0; }
+        .local-datos{ flex:1; min-width:0; }
+        .local-nombre{ font-size:14.5px; font-weight:700; color:var(--ink-900); margin-bottom:3px; }
+        .local-linea{ font-size:12.5px; color:var(--ink-600); margin-bottom:2px; }
+        .local-linea strong{ color:var(--ink-700); font-weight:600; }
+        .local-tags{ display:flex; gap:6px; flex-wrap:wrap; margin-top:7px; align-items:center; }
+        .local-acciones{ flex-shrink:0; display:flex; align-items:flex-start; }
+        .btn-reenviar{ background:var(--brand-600); color:#fff; }
+        .btn-reenviar:hover{ background:var(--brand-700); }
+
+        @media (max-width: 620px){
+            .local-row{ flex-wrap:wrap; }
+            .local-acciones{ width:100%; justify-content:flex-end; }
+        }
+    </style>
+</head>
+<body>
+<div class="page-wide">
+    <div class="topbar">
+        <h2>🗂️ Lista de locales</h2>
+        <div class="navlinks">
+            <a href="{{ url_for('index') }}">➕ Nuevo registro</a>
+            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% if dias %}
+        {% for dia in dias %}
+        <div class="dia-card {% if loop.first %}abierto{% endif %}" id="dia-{{ dia.fecha }}">
+            <button type="button" class="dia-header" onclick="toggleDia('{{ dia.fecha }}')">
+                <div class="dia-titulo">
+                    <span class="dia-nombre">{{ dia.fecha_larga }}</span>
+                </div>
+                <div class="dia-meta">
+                    <span class="dia-count">{{ dia.locales|length }} local{{ 'es' if dia.locales|length != 1 else '' }}</span>
+                    <span class="flecha">▼</span>
+                </div>
+            </button>
+
+            <div class="dia-body">
+                {% for r in dia.locales %}
+                <div class="local-row">
+                    <img class="local-foto" src="{{ url_for('uploaded_file', filename=r.foto) }}"
+                         alt="Local {{ r.numero }}" onclick="abrirZoom(this.src)">
+                    <div class="local-datos">
+                        <div class="local-nombre">Local N° {{ r.numero }} — {{ r.nombre }}</div>
+                        <div class="local-linea"><strong>Dirección:</strong> {{ r.direccion }}</div>
+                        <div class="local-linea"><strong>Objeción:</strong> {{ r.objecion if r.objecion else 'Sin objeción registrada.' }}</div>
+                        <div class="local-linea"><strong>Registrado:</strong> {{ r.hora_registro }}</div>
+                        <div class="local-linea">
+                            <strong>Hora de entrega:</strong>
+                            {{ r.hora_envio_real if r.hora_envio_real else r.hora_programada }}
+                        </div>
+                        <div class="local-tags">
+                            {% if r.estado == 'enviado' %}
+                                <span class="badge badge-enviado">✅ Enviado</span>
+                            {% else %}
+                                <span class="badge badge-pendiente">⏳ En proceso</span>
+                            {% endif %}
+                            {% if r.hora_manual %}<span class="badge-manual">🔒 Manual</span>{% endif %}
+                        </div>
+                    </div>
+                    <div class="local-acciones">
+                        <form method="POST" action="{{ url_for('reenviar', uid=r.uid) }}"
+                              onsubmit="return confirm('¿Re-enviar el Local N° {{ r.numero }} del {{ dia.fecha_larga }} al chat?');">
+                            <button type="submit" class="btn-pill btn-reenviar">🔁 Re-enviar</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty">Todavía no hay locales registrados.</div>
+    {% endif %}
+
+    <div class="cache-note" id="cacheNote"></div>
+</div>
+""" + ZOOM_HTML + """
+    <script id="datos-json" type="application/json">{{ datos_json | safe }}</script>
+    <script>
+        """ + CACHE_JS + """
+        """ + ZOOM_JS + """
+
+        // Acordeón: abrir/cerrar el día. Se recuerda qué días quedaron
+        // abiertos usando el localStorage del navegador.
+        const DIAS_KEY = 'dias_abiertos_v1';
+
+        function diasAbiertos() {
+            try { return JSON.parse(localStorage.getItem(DIAS_KEY)) || []; }
+            catch (e) { return []; }
+        }
+        function guardarDiasAbiertos(lista) {
+            try { localStorage.setItem(DIAS_KEY, JSON.stringify(lista)); } catch (e) {}
+        }
+        function toggleDia(fecha) {
+            const card = document.getElementById('dia-' + fecha);
+            if (!card) return;
+            card.classList.toggle('abierto');
+            let abiertos = diasAbiertos();
+            if (card.classList.contains('abierto')) {
+                if (!abiertos.includes(fecha)) abiertos.push(fecha);
+            } else {
+                abiertos = abiertos.filter(f => f !== fecha);
+            }
+            guardarDiasAbiertos(abiertos);
+        }
+
+        // Restaurar los días que el usuario había dejado abiertos
+        (function () {
+            const abiertos = diasAbiertos();
+            if (abiertos.length) {
+                document.querySelectorAll('.dia-card').forEach(c => c.classList.remove('abierto'));
+                abiertos.forEach(function (f) {
+                    const card = document.getElementById('dia-' + f);
+                    if (card) card.classList.add('abierto');
+                });
+            }
+        })();
+
+        // Copia local de todos los datos
+        (function () {
+            try {
+                const datos = JSON.parse(document.getElementById('datos-json').textContent);
+                guardarCacheLocal(datos);
+                const cache = leerCacheLocal();
+                if (cache) {
+                    document.getElementById('cacheNote').textContent =
+                        '💾 Copia local guardada: ' + new Date(cache.guardado).toLocaleString('es-AR');
+                }
+            } catch (e) { console.warn(e); }
+        })();
+    </script>
+</body>
+</html>
+"""
+
 
 HTML_EDIT = """
 <!DOCTYPE html>
@@ -782,7 +1111,7 @@ HTML_EDIT = """
 <div class="page">
     <div class="topbar">
         <h2>✏️ Editar local N° {{ registro.numero }}</h2>
-        <a href="{{ url_for('dashboard') }}">📊 Volver</a>
+        <div class="navlinks"><a href="{{ url_for('dashboard') }}">📊 Volver</a></div>
     </div>
 
     {% with messages = get_flashed_messages() %}
@@ -862,9 +1191,21 @@ HTML_EDIT = """
 """
 
 
+def datos_para_cache():
+    """Snapshot JSON del historial completo, para espejar en localStorage."""
+    with lock:
+        items = []
+        for r in registros.values():
+            item = {k: v for k, v in r.items() if k != "filepath"}
+            item["fecha_larga"] = fecha_larga(r.get("fecha", ""))
+            items.append(item)
+    items.sort(key=lambda r: r["uid"], reverse=True)
+    return json.dumps({"registros": items}, ensure_ascii=False)
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    global local_counter
+    global uid_counter
     calles_actuales = obtener_calles_actualizadas()
 
     if request.method == 'POST':
@@ -877,47 +1218,50 @@ def index():
         foto = request.files.get('foto')
 
         if calle:
-            estado_calles["calles"].add(calle)
+            with lock:
+                estado_calles["calles"].add(calle)
 
         direccion_completa = f"{calle} {altura}"
 
         if foto:
+            numero_dia = proximo_numero_del_dia()
             with lock:
-                num_local = local_counter
-                local_counter += 1
+                uid = uid_counter
+                uid_counter += 1
 
-            filename = f"local_{num_local}_{foto.filename}"
+            filename = f"local_{uid}_{foto.filename}"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             foto.save(filepath)
 
             hora_registro = datetime.now(ARG_TZ)
 
             # Se guarda primero con un horario provisorio: el cálculo
-            # definitivo (repartido entre TODOS los pendientes, incluido
-            # este nuevo local) lo hace recalcular_horarios_pendientes().
+            # definitivo (repartido entre TODOS los pendientes de hoy,
+            # incluido este) lo hace recalcular_horarios_pendientes().
             with lock:
-                registros[num_local] = {
-                    "numero": num_local,
+                registros[uid] = {
+                    "uid": uid,
+                    "numero": numero_dia,
+                    "fecha": hora_registro.strftime("%Y-%m-%d"),
                     "nombre": nombre_local,
                     "direccion": direccion_completa,
                     "objecion": objecion,
                     "hora_registro": hora_registro.strftime("%H:%M:%S"),
                     "hora_programada": "",
                     "hora_programada_iso": "",
+                    "hora_envio_real": "",
                     "estado": "pendiente",
                     "foto": filename,
                     "filepath": filepath,
                     "hora_manual": False,
                 }
 
-            # Reparte de nuevo el tiempo disponible (ahora -> 15:55) entre
-            # todos los locales pendientes, incluido este.
             recalcular_horarios_pendientes()
 
             with lock:
-                hora_envio_str = registros[num_local]["hora_programada"]
+                hora_envio_str = registros[uid]["hora_programada"]
 
-            flash(f"✅ Registro enviado. Notificación programada para las {hora_envio_str} (Local N° {num_local}).")
+            flash(f"✅ Registro guardado. Notificación programada para las {hora_envio_str} (Local N° {numero_dia}).")
             return redirect(url_for('index'))
 
     return render_template_string(
@@ -927,16 +1271,16 @@ def index():
         total_locales=contar_locales_hoy(),
         objetivo=TOTAL_LOCALES_OBJETIVO,
         objecion_random=OBJECION_RANDOM,
+        datos_json=datos_para_cache(),
     )
 
 
 @app.route('/dashboard')
 def dashboard():
     verificar_dia()
-    # Mostrar los más recientes primero
-    lista = sorted(registros.values(), key=lambda r: r["numero"], reverse=True)
+    lista_hoy = sorted(registros_de_hoy(), key=lambda r: r["uid"], reverse=True)
     lista_con_url = []
-    for r in lista:
+    for r in lista_hoy:
         item = dict(r)
         item["direccion_url"] = quote(r["direccion"])
         lista_con_url.append(item)
@@ -945,51 +1289,102 @@ def dashboard():
         registros=lista_con_url,
         total_locales=contar_locales_hoy(),
         objetivo=TOTAL_LOCALES_OBJETIVO,
+        datos_json=datos_para_cache(),
     )
 
 
-@app.route('/enviar_ahora/<int:num_local>', methods=['POST'])
-def enviar_ahora(num_local):
-    """Envía el reporte de un local de inmediato, sin esperar su turno programado."""
+@app.route('/lista')
+def lista():
+    """
+    Historial completo agrupado por fecha, en menús desplegables:
+    "Jueves 19 de Septiembre ▼". Acá sólo se puede re-enviar la info.
+    """
+    verificar_dia()
     with lock:
-        registro = registros.get(num_local)
+        todos = list(registros.values())
+
+    agrupado = {}
+    for r in todos:
+        agrupado.setdefault(r.get("fecha", ""), []).append(r)
+
+    dias = []
+    for fecha in sorted(agrupado.keys(), reverse=True):   # más reciente primero
+        locales = sorted(agrupado[fecha], key=lambda r: r["numero"])
+        dias.append({
+            "fecha": fecha,
+            "fecha_larga": fecha_larga(fecha),
+            "locales": locales,
+        })
+
+    return render_template_string(HTML_LISTA, dias=dias, datos_json=datos_para_cache())
+
+
+@app.route('/reenviar/<int:uid>', methods=['POST'])
+def reenviar(uid):
+    """
+    Re-envía la info de un local al chat, con un encabezado arriba de todo:
+        R.E FECHA: Jueves 19 de Septiembre
+    No cambia el estado del local ni su horario programado.
+    """
+    with lock:
+        registro = registros.get(uid)
 
     if not registro:
-        flash(f"⚠️ No se encontró el Local N° {num_local}.")
+        flash("⚠️ No se encontró ese local.")
+        return redirect(url_for('lista'))
+
+    encabezado = f"R.E FECHA: {fecha_larga(registro.get('fecha', ''))}"
+
+    enviar_reporte_telegram(
+        uid,
+        registro["nombre"],
+        registro["direccion"],
+        registro.get("filepath"),
+        registro["objecion"],
+        encabezado=encabezado,
+        numero_mostrado=registro["numero"],
+    )
+
+    flash(f"🔁 Local N° {registro['numero']} re-enviado al chat ({fecha_larga(registro.get('fecha', ''))}).")
+    return redirect(url_for('lista'))
+
+
+@app.route('/enviar_ahora/<int:uid>', methods=['POST'])
+def enviar_ahora(uid):
+    """Envía el reporte de un local de inmediato, sin esperar su turno programado."""
+    with lock:
+        registro = registros.get(uid)
+
+    if not registro:
+        flash("⚠️ No se encontró ese local.")
         return redirect(url_for('dashboard'))
 
     if registro["estado"] == "enviado":
-        flash(f"ℹ️ El Local N° {num_local} ya fue enviado.")
+        flash(f"ℹ️ El Local N° {registro['numero']} ya fue enviado.")
         return redirect(url_for('dashboard'))
 
-    # Cancelar el job programado (si todavía no se disparó)
     try:
-        scheduler.remove_job(f"job_{num_local}")
+        scheduler.remove_job(f"job_{uid}")
     except JobLookupError:
         pass
 
     enviar_reporte_telegram(
-        num_local,
-        registro["nombre"],
-        registro["direccion"],
-        registro["filepath"],
-        registro["objecion"],
+        uid, registro["nombre"], registro["direccion"],
+        registro["filepath"], registro["objecion"],
     )
-    # enviar_reporte_telegram ya se encarga de recalcular los pendientes
-    # restantes al final.
 
-    flash(f"📤 Local N° {num_local} enviado manualmente.")
+    flash(f"📤 Local N° {registro['numero']} enviado manualmente.")
     return redirect(url_for('dashboard'))
 
 
-@app.route('/editar/<int:num_local>', methods=['GET', 'POST'])
-def editar(num_local):
+@app.route('/editar/<int:uid>', methods=['GET', 'POST'])
+def editar(uid):
     """Permite corregir los datos de un local ya registrado (pendiente o enviado)."""
     with lock:
-        registro = registros.get(num_local)
+        registro = registros.get(uid)
 
     if not registro:
-        flash(f"⚠️ No se encontró el Local N° {num_local}.")
+        flash("⚠️ No se encontró ese local.")
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
@@ -1002,17 +1397,16 @@ def editar(num_local):
         foto = request.files.get('foto')
 
         if calle:
-            estado_calles["calles"].add(calle)
-
-        direccion_completa = f"{calle} {altura}".strip()
+            with lock:
+                estado_calles["calles"].add(calle)
 
         with lock:
             registro["nombre"] = nombre
-            registro["direccion"] = direccion_completa
+            registro["direccion"] = f"{calle} {altura}".strip()
             registro["objecion"] = objecion
 
             if foto and foto.filename:
-                filename = f"local_{num_local}_{foto.filename}"
+                filename = f"local_{uid}_{foto.filename}"
                 filepath = os.path.join(UPLOAD_FOLDER, filename)
                 foto.save(filepath)
 
@@ -1026,10 +1420,10 @@ def editar(num_local):
                 registro["foto"] = filename
                 registro["filepath"] = filepath
 
-        flash(f"✏️ Local N° {num_local} actualizado correctamente.")
+        guardar_estado()
+        flash(f"✏️ Local N° {registro['numero']} actualizado correctamente.")
         return redirect(url_for('dashboard'))
 
-    # Pre-cargar calle/altura a partir de la dirección guardada (formato "calle altura")
     partes = registro["direccion"].rsplit(" ", 1)
     if len(partes) == 2:
         calle_actual, altura_actual = partes
@@ -1047,18 +1441,18 @@ def editar(num_local):
     )
 
 
-@app.route('/eliminar/<int:num_local>', methods=['POST'])
-def eliminar(num_local):
+@app.route('/eliminar/<int:uid>', methods=['POST'])
+def eliminar(uid):
     """Elimina un local de la lista (pendiente o ya enviado) y su foto."""
     with lock:
-        registro = registros.pop(num_local, None)
+        registro = registros.pop(uid, None)
 
     if not registro:
-        flash(f"⚠️ No se encontró el Local N° {num_local}.")
+        flash("⚠️ No se encontró ese local.")
         return redirect(url_for('dashboard'))
 
     try:
-        scheduler.remove_job(f"job_{num_local}")
+        scheduler.remove_job(f"job_{uid}")
     except JobLookupError:
         pass
 
@@ -1070,30 +1464,29 @@ def eliminar(num_local):
             pass
 
     if registro["estado"] == "pendiente":
-        # Repartir de nuevo el tiempo libre entre los pendientes que quedan.
         recalcular_horarios_pendientes()
 
-    flash(f"🗑️ Local N° {num_local} eliminado.")
+    guardar_estado()
+    flash(f"🗑️ Local N° {registro['numero']} eliminado.")
     return redirect(url_for('dashboard'))
 
 
-@app.route('/ajustar_hora/<int:num_local>', methods=['POST'])
-def ajustar_hora(num_local):
+@app.route('/ajustar_hora/<int:uid>', methods=['POST'])
+def ajustar_hora(uid):
     """
     Fija manualmente el horario de envío de un local pendiente. A partir de
-    este momento, ese local queda excluido del reparto automático (no se le
-    va a mover la hora aunque se agreguen o eliminen otros locales), hasta
-    que se lo mande o se lo vuelva a poner en automático.
+    ahí queda excluido del reparto automático hasta que se envíe o se lo
+    vuelva a poner en automático.
     """
     with lock:
-        registro = registros.get(num_local)
+        registro = registros.get(uid)
 
     if not registro:
-        flash(f"⚠️ No se encontró el Local N° {num_local}.")
+        flash("⚠️ No se encontró ese local.")
         return redirect(url_for('dashboard'))
 
     if registro["estado"] == "enviado":
-        flash(f"ℹ️ El Local N° {num_local} ya fue enviado, no se puede reprogramar.")
+        flash(f"ℹ️ El Local N° {registro['numero']} ya fue enviado, no se puede reprogramar.")
         return redirect(url_for('dashboard'))
 
     nueva_hora_str = request.form.get('nueva_hora', '').strip()
@@ -1107,21 +1500,17 @@ def ajustar_hora(num_local):
     ahora = datetime.now(ARG_TZ)
     nueva_dt = ARG_TZ.localize(datetime.combine(ahora.date(), hora_elegida))
 
-    minimo_permitido = ahora + timedelta(minutes=INTERVALO_MINIMO_MINUTOS)
-    if nueva_dt < minimo_permitido:
+    if nueva_dt < ahora + timedelta(minutes=INTERVALO_MINIMO_MINUTOS):
         flash(f"⚠️ La hora tiene que ser al menos {INTERVALO_MINIMO_MINUTOS} minutos después de ahora.")
         return redirect(url_for('dashboard'))
 
-    job_id = f"job_{num_local}"
+    job_id = f"job_{uid}"
     try:
         scheduler.reschedule_job(job_id, trigger='date', run_date=nueva_dt)
     except JobLookupError:
         scheduler.add_job(
-            func=enviar_reporte_telegram,
-            trigger='date',
-            run_date=nueva_dt,
-            id=job_id,
-            args=[num_local, registro["nombre"], registro["direccion"],
+            func=enviar_reporte_telegram, trigger='date', run_date=nueva_dt, id=job_id,
+            args=[uid, registro["nombre"], registro["direccion"],
                   registro["filepath"], registro["objecion"]]
         )
 
@@ -1130,33 +1519,34 @@ def ajustar_hora(num_local):
         registro["hora_programada_iso"] = nueva_dt.isoformat()
         registro["hora_manual"] = True
 
-    # Redistribuir el tiempo restante entre los demás pendientes automáticos.
     recalcular_horarios_pendientes()
+    guardar_estado()
 
-    flash(f"🕒 Hora del Local N° {num_local} fijada manualmente a las {nueva_dt.strftime('%H:%M')}.")
+    flash(f"🕒 Hora del Local N° {registro['numero']} fijada manualmente a las {nueva_dt.strftime('%H:%M')}.")
     return redirect(url_for('dashboard'))
 
 
-@app.route('/auto_hora/<int:num_local>', methods=['POST'])
-def auto_hora(num_local):
+@app.route('/auto_hora/<int:uid>', methods=['POST'])
+def auto_hora(uid):
     """Devuelve un local con hora fijada manualmente al reparto automático."""
     with lock:
-        registro = registros.get(num_local)
+        registro = registros.get(uid)
 
     if not registro:
-        flash(f"⚠️ No se encontró el Local N° {num_local}.")
+        flash("⚠️ No se encontró ese local.")
         return redirect(url_for('dashboard'))
 
     if registro["estado"] == "enviado":
-        flash(f"ℹ️ El Local N° {num_local} ya fue enviado.")
+        flash(f"ℹ️ El Local N° {registro['numero']} ya fue enviado.")
         return redirect(url_for('dashboard'))
 
     with lock:
         registro["hora_manual"] = False
 
     recalcular_horarios_pendientes()
+    guardar_estado()
 
-    flash(f"🔄 Local N° {num_local} vuelve al reparto automático.")
+    flash(f"🔄 Local N° {registro['numero']} vuelve al reparto automático.")
     return redirect(url_for('dashboard'))
 
 
@@ -1166,10 +1556,22 @@ def api_objeciones():
     return jsonify(OBJECIONES)
 
 
+@app.route('/api/datos')
+def api_datos():
+    """Historial completo en JSON (lo mismo que se espeja en localStorage)."""
+    return app.response_class(datos_para_cache(), mimetype='application/json')
+
+
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 
+cargar_estado()
+reprogramar_jobs_pendientes()
+
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # use_reloader=False: con el reloader, Flask levanta 2 procesos y se
+    # duplicarían los envíos programados del scheduler.
+    app.run(debug=True, port=5000, use_reloader=False)
