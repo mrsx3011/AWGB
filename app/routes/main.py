@@ -4,7 +4,8 @@ from urllib.parse import quote
 
 from flask import Response, flash, jsonify, redirect, render_template_string, request, url_for
 
-from ..constants import ARG_TZ, INTERVALO_MINIMO_MINUTOS, OBJECION_RANDOM, OBJECIONES, TOTAL_LOCALES_OBJETIVO
+from ..constants import (ARG_TZ, INTERVALO_MINIMO_MINUTOS, OBJECION_RANDOM, OBJECIONES,
+                         TIPOS_LOCALES, TOTAL_LOCALES_OBJETIVO)
 from ..database import CAMPOS, ejecutar, todos, uno
 from ..logging_utils import log
 from ..services.locales import (calles_de_hoy, contar_locales_hoy, fecha_larga, locales_de_hoy,
@@ -73,6 +74,7 @@ def register_main_routes(app):
             HTML_FORM,
             calles=calles_de_hoy(usuario),
             objeciones=OBJECIONES,
+            tipos_locales=TIPOS_LOCALES,
             total_locales=contar_locales_hoy(usuario),
             objetivo=TOTAL_LOCALES_OBJETIVO,
             objecion_random=OBJECION_RANDOM,
@@ -189,6 +191,7 @@ def register_main_routes(app):
             altura_actual=altura_actual,
             calles=calles_de_hoy(usuario),
             objeciones=OBJECIONES,
+            tipos_locales=TIPOS_LOCALES,
             objecion_random=OBJECION_RANDOM,
         )
 

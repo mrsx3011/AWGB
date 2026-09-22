@@ -281,7 +281,10 @@ HTML_FORM = """
         <form method="POST" enctype="multipart/form-data" id="registroForm">
             <div class="field">
                 <label>Local</label>
-                <input type="text" name="local" required placeholder="Ej: Sucursal Centro">
+                <input type="text" name="local" list="tipos_locales" required placeholder="Ej: Verduleria">
+                <datalist id="tipos_locales">
+                    {% for tipo in tipos_locales %}<option value="{{ tipo }}"></option>{% endfor %}
+                </datalist>
             </div>
             <div class="field">
                 <label>Calle</label>
@@ -833,7 +836,10 @@ HTML_EDIT = """
         <form method="POST" enctype="multipart/form-data">
             <div class="field">
                 <label>Local</label>
-                <input type="text" name="local" required value="{{ registro.nombre }}">
+                <input type="text" name="local" list="tipos_locales" required value="{{ registro.nombre }}">
+                <datalist id="tipos_locales">
+                    {% for tipo in tipos_locales %}<option value="{{ tipo }}"></option>{% endfor %}
+                </datalist>
             </div>
             <div class="field">
                 <label>Calle</label>

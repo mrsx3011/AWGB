@@ -12,6 +12,31 @@ MARGEN_JITTER_MINUTOS = 20
 TOTAL_LOCALES_OBJETIVO = 20
 OBJECION_RANDOM = "Random"
 
+TIPOS_LOCALES = [
+    "Verduleria",
+    "Carniceria",
+    "Fiambreria",
+    "Indumentaria",
+    "Petshop",
+    "Peluqueria",
+    "Ferreteria",
+    "Optica",
+    "Venta de ropa y accesorios de cuero",
+    "Ventas de accesorios para telefonos",
+    "Cafeteria",
+    "Restaurante",
+    "Tienda de musica",
+    "Papeleria",
+    "Bazar",
+    "Perfumeria",
+    "Bicicleteria",
+    "Mecanica",
+    "Ventas de saumerio",
+    "Productos varios",
+    "Ventas de vino",
+    "Supermercado",
+]
+
 OBJECIONES = [
     "El dueño no se encontraba en el local.",
     "Ya tenian mercado pago y no lo quieren cambiar.",
