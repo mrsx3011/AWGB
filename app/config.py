@@ -13,14 +13,19 @@ def env(nombre, default=None):
     return valor
 
 
+def optional_env(nombre, default=None):
+    valor = os.environ.get(nombre, default)
+    return valor or None
+
+
 class Config:
     SECRET_KEY = env("KEY_SECRET")
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024
     PERMANENT_SESSION_LIFETIME = timedelta(days=30)
 
 
-TELEGRAM_TOKEN = env("TELEGRAM_TOKEN")
-CHAT_ID = env("CHAT_ID")
+TELEGRAM_TOKEN = optional_env("TELEGRAM_TOKEN")
+CHAT_ID = optional_env("CHAT_ID")
 
 DB_CONFIG = dict(
     host=env("DB_HOST"),

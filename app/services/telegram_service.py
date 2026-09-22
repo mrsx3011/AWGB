@@ -9,7 +9,20 @@ from ..database import ejecutar, uno
 from ..logging_utils import log
 
 
+def _validar_config_telegram():
+    faltantes = []
+    if not TELEGRAM_TOKEN:
+        faltantes.append("TELEGRAM_TOKEN")
+    if not CHAT_ID:
+        faltantes.append("CHAT_ID")
+    if faltantes:
+        raise RuntimeError(
+            "Faltan variables de entorno para Telegram: " + ", ".join(faltantes)
+        )
+
+
 def _telegram(metodo, **kwargs):
+    _validar_config_telegram()
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/{metodo}"
     resp = requests.post(url, timeout=60, **kwargs)
     log("TELEGRAM", f"{metodo} -> HTTP {resp.status_code}")
