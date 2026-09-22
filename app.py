@@ -1,15 +1,9 @@
 import os
 import sys
 
-from app import create_app
-from app.database import crear_usuario, init_db
+from app import app
+from app.database import crear_usuario
 from app.logging_utils import log
-from app.services.scheduler_service import reprogramar_jobs_pendientes
-
-app = create_app()
-
-init_db()
-reprogramar_jobs_pendientes()
 
 if __name__ == "__main__":
     if len(sys.argv) == 5 and sys.argv[1] == "crear_usuario":
