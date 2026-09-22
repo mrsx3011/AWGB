@@ -163,6 +163,13 @@ button{ font-family:inherit; }
 .btn-primary{ background:var(--brand-600); color:#fff; border:none; padding:12px 16px; border-radius:var(--radius-sm);
     cursor:pointer; font-size:14.5px; font-weight:600; width:100%; }
 .btn-primary:hover{ background:var(--brand-700); }
+.btn-primary:disabled, .btn-pill:disabled{ opacity:.72; cursor:wait; pointer-events:none; }
+.btn-loading{ display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+.btn-loading::before{
+    content:""; width:13px; height:13px; border:2px solid currentColor; border-right-color:transparent;
+    border-radius:50%; animation:spin .75s linear infinite; flex-shrink:0;
+}
+@keyframes spin{ to{ transform:rotate(360deg); } }
 .btn-pill{ display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:99px;
     font-size:12.5px; font-weight:600; border:1px solid transparent; cursor:pointer; white-space:nowrap;
     transition:background .15s ease, transform .05s ease; line-height:1; font-family:inherit; text-decoration:none; }
@@ -253,7 +260,7 @@ HTML_FORM = """
     {% endwith %}
 
     <div class="card">
-        <form method="POST" enctype="multipart/form-data">
+        <form method="POST" enctype="multipart/form-data" id="registroForm">
             <div class="field">
                 <label>Local</label>
                 <input type="text" name="local" required placeholder="Ej: Sucursal Centro">
@@ -285,7 +292,7 @@ HTML_FORM = """
                     <div class="preview-hint">Click en la imagen para hacer zoom</div>
                 </div>
             </div>
-            <button type="submit" class="btn-primary">Enviar registro</button>
+            <button type="submit" class="btn-primary" id="btnRegistro">Enviar registro</button>
         </form>
     </div>
 </div>
@@ -301,6 +308,18 @@ HTML_FORM = """
             reader.onload = function(e) { img.src = e.target.result; box.style.display = 'block'; };
             reader.readAsDataURL(file);
         }
+        const registroForm = document.getElementById('registroForm');
+        const btnRegistro = document.getElementById('btnRegistro');
+        registroForm.addEventListener('submit', function () {
+            btnRegistro.disabled = true;
+            btnRegistro.classList.add('btn-loading');
+            btnRegistro.textContent = 'Enviando...';
+        });
+        window.addEventListener('pageshow', function () {
+            btnRegistro.disabled = false;
+            btnRegistro.classList.remove('btn-loading');
+            btnRegistro.textContent = 'Enviar registro';
+        });
     </script>
 </body>
 </html>
@@ -443,7 +462,7 @@ HTML_DASHBOARD = """
                     <div class="action-groups">
                         {% if r.estado == 'pendiente' %}
                         <form method="POST" action="{{ url_for('enviar_ahora', uid=r.uid) }}"
-                              onsubmit="return confirm('¿Enviar el Local N° {{ r.numero }} ahora mismo?');">
+                              onsubmit="return confirmarEnvioManual(this, '¿Enviar el Local N° {{ r.numero }} ahora mismo?');">
                             <button type="submit" class="btn-pill btn-enviar">📤 Enviar</button>
                         </form>
                         {% else %}
@@ -522,6 +541,20 @@ HTML_DASHBOARD = """
         }
         document.addEventListener('click', e => { if (!e.target.closest('.conf-menu')) cerrarTodosLosConf(); });
         document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarTodosLosConf(); });
+
+        function bloquearSubmit(form, texto) {
+            const btn = form.querySelector('button[type="submit"]');
+            if (!btn) return;
+            btn.disabled = true;
+            btn.classList.add('btn-loading');
+            btn.textContent = texto;
+        }
+
+        function confirmarEnvioManual(form, mensaje) {
+            if (!confirm(mensaje)) return false;
+            bloquearSubmit(form, 'Enviando...');
+            return true;
+        }
 
         function formatearDuracion(totalSegundos) {
             const horas = Math.floor(totalSegundos / 3600);
