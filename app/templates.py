@@ -160,6 +160,24 @@ select{ appearance:none; -webkit-appearance:none;
     background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='%2357626C' d='M5.5 7.5l4.5 4.5 4.5-4.5z'/%3e%3c/svg%3e");
     background-repeat:no-repeat; background-position:right 10px center; padding-right:32px; }
 button{ font-family:inherit; }
+.input-action-row{ display:flex; gap:8px; align-items:stretch; }
+.input-action-row input{ flex:1; min-width:0; }
+.icon-action{
+    border:1px solid var(--line); background:var(--surface); color:var(--ink-700);
+    border-radius:var(--radius-sm); padding:0 11px; min-width:42px; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px; font-weight:600;
+}
+.icon-action:hover{ background:var(--paper); }
+.icon-action:disabled{ opacity:.68; cursor:wait; }
+.field-status{ margin-top:6px; font-size:12px; color:var(--ink-600); min-height:16px; }
+.photo-actions{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.photo-action{
+    border:1px solid var(--line); background:var(--surface); color:var(--ink-700);
+    border-radius:var(--radius-sm); padding:11px 10px; cursor:pointer; font-size:13.5px; font-weight:700;
+}
+.photo-action:hover{ background:var(--paper); border-color:var(--ink-300); }
+.file-hidden{ position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+@media (max-width: 420px){ .photo-actions{ grid-template-columns:1fr; } }
 .btn-primary{ background:var(--brand-600); color:#fff; border:none; padding:12px 16px; border-radius:var(--radius-sm);
     cursor:pointer; font-size:14.5px; font-weight:600; width:100%; }
 .btn-primary:hover{ background:var(--brand-700); }
@@ -267,7 +285,13 @@ HTML_FORM = """
             </div>
             <div class="field">
                 <label>Calle</label>
-                <input type="text" name="calle" list="calles_registradas" required placeholder="Ej: Av. Corrientes" autocomplete="off">
+                <div class="input-action-row">
+                    <input type="text" name="calle" id="calleInput" list="calles_registradas" required placeholder="Ej: Av. Corrientes" autocomplete="off">
+                    <button type="button" class="icon-action" id="btnUbicacion"
+                            title="Usar mi ubicación actual" aria-label="Usar mi ubicación actual"
+                            onclick="detectarCalleActual()">📍</button>
+                </div>
+                <div class="field-status" id="ubicacionStatus"></div>
                 <datalist id="calles_registradas">
                     {% for calle in calles %}<option value="{{ calle }}"></option>{% endfor %}
                 </datalist>
@@ -286,7 +310,12 @@ HTML_FORM = """
             </div>
             <div class="field">
                 <label>Foto del local</label>
-                <input type="file" name="foto" id="fotoInput" accept="image/*" required onchange="mostrarPreview(event)">
+                <div class="photo-actions">
+                    <button type="button" class="photo-action" onclick="abrirSelectorFoto('archivo')">🖼️ Seleccionar foto</button>
+                    <button type="button" class="photo-action" onclick="abrirSelectorFoto('camara')">📷 Sacar foto</button>
+                </div>
+                <input type="file" name="foto" id="fotoInput" class="file-hidden" accept="image/*" required onchange="mostrarPreview(event)">
+                <div class="field-status" id="fotoStatus">Elegí una foto guardada o sacá una nueva.</div>
                 <div class="preview-box" id="previewBox">
                     <img class="preview-thumb" id="previewImg" alt="Vista previa" onclick="abrirZoom(this.src)">
                     <div class="preview-hint">Click en la imagen para hacer zoom</div>
@@ -299,14 +328,91 @@ HTML_FORM = """
 """ + ZOOM_HTML + """
     <script>
         """ + ZOOM_JS + """
+        function abrirSelectorFoto(modo) {
+            const input = document.getElementById('fotoInput');
+            const status = document.getElementById('fotoStatus');
+            input.value = '';
+            if (modo === 'camara') {
+                input.setAttribute('capture', 'environment');
+                status.textContent = 'Abriendo cámara...';
+            } else {
+                input.removeAttribute('capture');
+                status.textContent = 'Seleccioná una foto del dispositivo.';
+            }
+            input.click();
+        }
+
         function mostrarPreview(event) {
             const file = event.target.files[0];
             const box = document.getElementById('previewBox');
             const img = document.getElementById('previewImg');
-            if (!file) { box.style.display = 'none'; img.src = ''; return; }
+            const status = document.getElementById('fotoStatus');
+            if (!file) {
+                box.style.display = 'none';
+                img.src = '';
+                status.textContent = 'Elegí una foto guardada o sacá una nueva.';
+                return;
+            }
             const reader = new FileReader();
             reader.onload = function(e) { img.src = e.target.result; box.style.display = 'block'; };
             reader.readAsDataURL(file);
+            status.textContent = file.name || 'Foto lista para enviar.';
+        }
+
+        function calleDesdeDireccion(address) {
+            return address.road || address.pedestrian || address.footway || address.cycleway ||
+                   address.path || address.residential || '';
+        }
+
+        function detectarCalleActual() {
+            const btn = document.getElementById('btnUbicacion');
+            const input = document.getElementById('calleInput');
+            const status = document.getElementById('ubicacionStatus');
+            if (!navigator.geolocation) {
+                status.textContent = 'Tu navegador no permite detectar ubicación.';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.classList.add('btn-loading');
+            status.textContent = 'Detectando ubicación...';
+
+            navigator.geolocation.getCurrentPosition(function(pos) {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                const url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&lat=' +
+                            encodeURIComponent(lat) + '&lon=' + encodeURIComponent(lon);
+
+                fetch(url, { headers: { 'Accept': 'application/json' } })
+                    .then(resp => {
+                        if (!resp.ok) throw new Error('No se pudo consultar la dirección');
+                        return resp.json();
+                    })
+                    .then(data => {
+                        const calle = calleDesdeDireccion(data.address || {});
+                        if (!calle) {
+                            status.textContent = 'No pude identificar el nombre de la calle.';
+                            return;
+                        }
+                        input.value = calle;
+                        status.textContent = 'Calle detectada: ' + calle;
+                    })
+                    .catch(() => {
+                        status.textContent = 'No pude obtener el nombre de la calle.';
+                    })
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.classList.remove('btn-loading');
+                    });
+            }, function() {
+                status.textContent = 'Permiso de ubicación denegado o no disponible.';
+                btn.disabled = false;
+                btn.classList.remove('btn-loading');
+            }, {
+                enableHighAccuracy: true,
+                timeout: 12000,
+                maximumAge: 60000
+            });
         }
         const registroForm = document.getElementById('registroForm');
         const btnRegistro = document.getElementById('btnRegistro');
