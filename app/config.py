@@ -9,7 +9,7 @@ import pymysql.cursors
 def env(nombre, default=None):
     valor = os.environ.get(nombre, default)
     if valor in (None, ""):
-        print(f"❌ Falta la variable de entorno: {nombre}", flush=True)
+        print(f"❌ Falta agregar la variable de entorno: {nombre}", flush=True)
         sys.exit(1)
     return valor
 
