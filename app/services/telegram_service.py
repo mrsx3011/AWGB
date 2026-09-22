@@ -40,8 +40,6 @@ def _post_telegram_texto(texto):
 
 
 def enviar_reporte_telegram(uid, encabezado=None):
-    from .scheduler_service import recalcular_horarios_pendientes
-
     log("ENVIO", f"▶️ Iniciando envío del local id={uid} (re-envío={bool(encabezado)})")
     try:
         r = uno("SELECT id AS uid, usuario, nombre, direccion, objecion, numero, estado, foto, foto_mime "
@@ -74,7 +72,6 @@ def enviar_reporte_telegram(uid, encabezado=None):
         if encabezado is None:
             ejecutar("UPDATE locales SET estado='enviado', hora_envio_real=%s WHERE id=%s",
                      (datetime.now(ARG_TZ).strftime("%H:%M:%S"), uid))
-            recalcular_horarios_pendientes(r["usuario"])
         log("ENVIO", f"✅ Local id={uid} enviado correctamente")
     except Exception as e:
         log("ENVIO", f"❌ FALLÓ el envío del local {uid}: {e!r}")

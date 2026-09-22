@@ -523,14 +523,22 @@ HTML_DASHBOARD = """
         document.addEventListener('click', e => { if (!e.target.closest('.conf-menu')) cerrarTodosLosConf(); });
         document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarTodosLosConf(); });
 
+        function formatearDuracion(totalSegundos) {
+            const horas = Math.floor(totalSegundos / 3600);
+            const mins = Math.floor((totalSegundos % 3600) / 60);
+            const secs = totalSegundos % 60;
+            if (horas > 0) {
+                return horas + 'h' + (mins > 0 ? ' ' + mins.toString().padStart(2, '0') + 'm' : '');
+            }
+            return mins + 'm ' + secs.toString().padStart(2, '0') + 's';
+        }
+
         function actualizarCountdowns() {
             document.querySelectorAll('.countdown').forEach(function(el) {
                 const target = new Date(el.dataset.target);
                 const diffMs = target - new Date();
                 if (diffMs <= 0) { el.textContent = 'llegando...'; return; }
-                const mins = Math.floor(diffMs / 60000);
-                const secs = Math.floor((diffMs % 60000) / 1000);
-                el.textContent = 'faltan ' + mins + 'm ' + secs.toString().padStart(2, '0') + 's';
+                el.textContent = 'faltan ' + formatearDuracion(Math.floor(diffMs / 1000));
             });
         }
         setInterval(actualizarCountdowns, 1000);
