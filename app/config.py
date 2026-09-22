@@ -1,6 +1,7 @@
 import os
 import sys
 from datetime import timedelta
+from urllib.parse import urlparse, unquote
 
 import pymysql.cursors
 
@@ -27,14 +28,40 @@ class Config:
 TELEGRAM_TOKEN = optional_env("TELEGRAM_TOKEN")
 CHAT_ID = optional_env("CHAT_ID")
 
-DB_CONFIG = dict(
-    host=env("DB_HOST"),
-    port=int(os.environ.get("DB_PORT", 3306)),
-    user=env("DB_USER"),
-    password=env("DB_PASSWORD"),
-    database=env("DB_NAME"),
-    charset="utf8mb4",
-    cursorclass=pymysql.cursors.DictCursor,
-    autocommit=True,
-    connect_timeout=10,
-)
+
+def _db_config_from_url(url):
+    parsed = urlparse(url)
+    if parsed.scheme not in ("mysql", "mysql+pymysql"):
+        print("❌ DATABASE_URL debe usar mysql:// o mysql+pymysql://", flush=True)
+        sys.exit(1)
+    return dict(
+        host=parsed.hostname,
+        port=parsed.port or 3306,
+        user=unquote(parsed.username or ""),
+        password=unquote(parsed.password or ""),
+        database=(parsed.path or "").lstrip("/"),
+        charset="utf8mb4",
+        cursorclass=pymysql.cursors.DictCursor,
+        autocommit=True,
+        connect_timeout=10,
+    )
+
+
+def _db_config_from_env():
+    database_url = optional_env("DATABASE_URL") or optional_env("MYSQL_URL")
+    if database_url:
+        return _db_config_from_url(database_url)
+    return dict(
+        host=env("DB_HOST"),
+        port=int(os.environ.get("DB_PORT", 3306)),
+        user=env("DB_USER"),
+        password=env("DB_PASSWORD"),
+        database=env("DB_NAME"),
+        charset="utf8mb4",
+        cursorclass=pymysql.cursors.DictCursor,
+        autocommit=True,
+        connect_timeout=10,
+    )
+
+
+DB_CONFIG = _db_config_from_env()
