@@ -12,7 +12,7 @@ from ..services.locales import (calles_de_hoy, contar_locales_hoy, fecha_larga, 
                                 obtener_local, proximo_numero_del_dia)
 from ..services.scheduler_service import agendar, recalcular_horarios_pendientes, reprogramar_jobs_pendientes, scheduler
 from ..services.telegram_service import enviar_reporte_telegram
-from ..templates import HTML_DASHBOARD, HTML_EDIT, HTML_FORM, HTML_LISTA
+from ..templates import HTML_DASHBOARD, HTML_EDIT, HTML_FORM, HTML_LISTA, HTML_STATS
 from .auth import usuario_actual
 
 
@@ -94,6 +94,11 @@ def register_main_routes(app):
             total_locales=len(lista_hoy),
             objetivo=TOTAL_LOCALES_OBJETIVO,
         )
+
+
+    @app.route('/estadisticas')
+    def estadisticas():
+        return render_template_string(HTML_STATS, usuario=usuario_actual())
 
 
     @app.route('/lista')

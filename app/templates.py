@@ -258,6 +258,7 @@ HTML_FORM = """
         <h2>Registro de local</h2>
         <div class="navlinks">
             <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+            <a href="{{ url_for('estadisticas') }}">📈 Estadísticas</a>
             <a href="{{ url_for('lista') }}">🗂️ Lista</a>
             <a href="{{ url_for('logout') }}">🚪 Salir ({{ session['usuario'] }})</a>
         </div>
@@ -512,6 +513,7 @@ HTML_DASHBOARD = """
         <div class="navlinks">
             <a href="{{ url_for('index') }}">➕ Nuevo registro</a>
             <a href="{{ url_for('lista') }}">🗂️ Lista de locales</a>
+            <a href="{{ url_for('estadisticas') }}">📈 Estadísticas</a>
             <a href="{{ url_for('logout') }}">🚪 Salir ({{ session['usuario'] }})</a>
         </div>
     </div>
@@ -730,6 +732,32 @@ HTML_LISTA = """
         .local-acciones{ flex-shrink:0; display:flex; align-items:flex-start; }
         .btn-reenviar{ background:var(--brand-600); color:#fff; }
         .btn-reenviar:hover{ background:var(--brand-700); }
+        .stats-history-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg);
+            box-shadow:var(--shadow-card); margin-bottom:18px; padding:20px; }
+        .stats-history-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; }
+        .stats-history-head h3{ margin:0 0 4px; font-size:17px; }
+        .stats-history-head p{ margin:0; color:var(--ink-600); font-size:12.5px; }
+        .stats-save-button{ border:0; border-radius:8px; background:var(--brand-600); color:#fff; padding:10px 14px;
+            cursor:pointer; font:inherit; font-size:13px; font-weight:700; transition:transform .16s ease, background .16s ease, opacity .16s ease; }
+        .stats-save-button:hover{ background:var(--brand-700); transform:translateY(-2px); }
+        .stats-save-button:disabled{ opacity:.62; cursor:wait; transform:none; }
+        .stats-history-message{ min-height:18px; margin-top:12px; font-size:12.5px; font-weight:600; }
+        .stats-history-message.success{ color:var(--green-700); }
+        .stats-history-message.error{ color:var(--red-700); }
+        .stats-history-message.loading{ color:var(--brand-700); }
+        .stats-month-list{ display:grid; gap:10px; margin-top:16px; }
+        .stats-month-card{ border:1px solid var(--line); border-radius:10px; padding:14px; background:#fff; animation:cardIn .25s ease both; }
+        .stats-month-title{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+        .stats-month-title h4{ margin:0; font-size:14px; color:var(--ink-900); }
+        .stats-month-title span{ color:var(--ink-600); font-size:11.5px; }
+        .stats-month-metrics{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; margin-top:12px; }
+        .stats-month-metric{ background:var(--paper); border-radius:8px; padding:9px 10px; }
+        .stats-month-metric strong{ display:block; font-size:17px; color:var(--ink-900); }
+        .stats-month-metric span{ color:var(--ink-600); font-size:11px; }
+        .stats-month-objections{ display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+        .stats-objection-chip{ background:var(--brand-100); color:var(--brand-700); border-radius:99px; padding:5px 9px; font-size:11.5px; font-weight:600; }
+        .stats-history-empty{ color:var(--ink-600); font-size:12.5px; padding-top:16px; }
+        @keyframes cardIn{ from{ opacity:0; transform:translateY(5px); } to{ opacity:1; transform:translateY(0); } }
         @media (max-width: 620px){
             .local-row{ flex-wrap:wrap; }
             .local-acciones{ width:100%; justify-content:flex-end; }
@@ -743,6 +771,7 @@ HTML_LISTA = """
         <div class="navlinks">
             <a href="{{ url_for('index') }}">➕ Nuevo registro</a>
             <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+            <a href="{{ url_for('estadisticas') }}">📈 Estadísticas</a>
             <a href="{{ url_for('logout') }}">🚪 Salir ({{ session['usuario'] }})</a>
         </div>
     </div>
@@ -750,6 +779,18 @@ HTML_LISTA = """
     {% with messages = get_flashed_messages() %}
       {% if messages %}{% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}{% endif %}
     {% endwith %}
+
+    <section class="stats-history-card">
+        <div class="stats-history-head">
+            <div>
+                <h3>📊 Estadísticas mensuales</h3>
+                <p>Guardá el período actual o consultá los resultados archivados por mes.</p>
+            </div>
+            <button type="button" class="stats-save-button" id="saveStatsMonth">💾 Guardar estadísticas</button>
+        </div>
+        <div id="statsHistoryMessage" class="stats-history-message" role="status" aria-live="polite"></div>
+        <div id="statsMonthList" class="stats-month-list"></div>
+    </section>
 
     {% if dias %}
         {% for dia in dias %}
@@ -802,6 +843,77 @@ HTML_LISTA = """
 """ + ZOOM_HTML + """
     <script>
         """ + ZOOM_JS + """
+        const statsStorageKey = 'gednet-estadisticas-v1-' + {{ session['usuario']|tojson }};
+        const statsHistoryKey = 'gednet-estadisticas-historial-v1-' + {{ session['usuario']|tojson }};
+        const emptyMonthlyStats = { yes: 0, no: 0, sales: 0, objections: [], periodMonth: '' };
+
+        function monthKey(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            return year + '-' + month;
+        }
+        function monthLabel(key) {
+            const parts = key.split('-');
+            const date = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+            return new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric' }).format(date);
+        }
+        function readStats() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(statsStorageKey));
+                return { ...emptyMonthlyStats, ...(saved || {}), objections: Array.isArray(saved && saved.objections) ? saved.objections : [] };
+            } catch (error) { return { ...emptyMonthlyStats, objections: [] }; }
+        }
+        function readHistory() {
+            try { const saved = JSON.parse(localStorage.getItem(statsHistoryKey)); return Array.isArray(saved) ? saved : []; }
+            catch (error) { return []; }
+        }
+        function writeStats(stats) { localStorage.setItem(statsStorageKey, JSON.stringify(stats)); }
+        function writeHistory(history) { localStorage.setItem(statsHistoryKey, JSON.stringify(history)); }
+        function snapshotStats(stats) { return { yes: Number(stats.yes || 0), no: Number(stats.no || 0), sales: Number(stats.sales || 0), objections: (stats.objections || []).map(item => ({ text: item.text, count: Number(item.count || 0) })) }; }
+        function ensureMonthlyRollover() {
+            const currentMonth = monthKey(new Date());
+            const stats = readStats();
+            if (!stats.periodMonth) { stats.periodMonth = currentMonth; writeStats(stats); return stats; }
+            if (stats.periodMonth === currentMonth) return stats;
+            const history = readHistory().filter(item => item.month !== stats.periodMonth);
+            history.unshift({ month: stats.periodMonth, stats: snapshotStats(stats), savedAt: new Date().toISOString() });
+            writeHistory(history);
+            const reset = { ...emptyMonthlyStats, periodMonth: currentMonth };
+            writeStats(reset);
+            return reset;
+        }
+        function setHistoryMessage(text, type) { const box = document.getElementById('statsHistoryMessage'); box.textContent = text; box.className = 'stats-history-message ' + (type || ''); }
+        function renderStatsHistory() {
+            const list = document.getElementById('statsMonthList');
+            const current = ensureMonthlyRollover();
+            const history = readHistory();
+            const records = [{ month: current.periodMonth || monthKey(new Date()), stats: snapshotStats(current), current: true }, ...history].filter((item, index, array) => array.findIndex(other => other.month === item.month) === index);
+            if (!records.length) { list.innerHTML = '<div class="stats-history-empty">Todavía no hay estadísticas mensuales guardadas.</div>'; return; }
+            list.innerHTML = records.map(record => {
+                const stats = record.stats || {};
+                const objections = (stats.objections || []).sort((a, b) => Number(b.count || 0) - Number(a.count || 0)).slice(0, 8);
+                const chips = objections.length ? objections.map(item => '<span class="stats-objection-chip">' + String(item.text || '') + ' · ' + Number(item.count || 0) + '</span>').join('') : '<span class="stats-month-title"><span>Sin objeciones registradas</span></span>';
+                return '<article class="stats-month-card"><div class="stats-month-title"><h4>Estadísticas de ' + monthLabel(record.month) + (record.current ? ' · actual' : '') + '</h4><span>Guardado localmente</span></div><div class="stats-month-metrics"><div class="stats-month-metric"><strong>' + Number(stats.yes || 0) + ' / ' + Number(stats.no || 0) + '</strong><span>SI / NO</span></div><div class="stats-month-metric"><strong>' + Number(stats.sales || 0) + '</strong><span>Ventas obtenidas</span></div><div class="stats-month-metric"><strong>' + (Number(stats.yes || 0) + Number(stats.no || 0)) + '</strong><span>Locales visitados</span></div></div><div class="stats-month-objections">' + chips + '</div></article>';
+            }).join('');
+        }
+        document.getElementById('saveStatsMonth').addEventListener('click', function() {
+            const button = this;
+            button.disabled = true;
+            setHistoryMessage('Guardando estadísticas del mes...', 'loading');
+            try {
+                const stats = ensureMonthlyRollover();
+                const history = readHistory().filter(item => item.month !== stats.periodMonth);
+                history.unshift({ month: stats.periodMonth || monthKey(new Date()), stats: snapshotStats(stats), savedAt: new Date().toISOString() });
+                writeHistory(history);
+                renderStatsHistory();
+                setHistoryMessage('Estadísticas guardadas correctamente.', 'success');
+            } catch (error) {
+                console.error(error);
+                setHistoryMessage('No se pudieron guardar las estadísticas.', 'error');
+            }
+            setTimeout(() => { button.disabled = false; }, 350);
+        });
+        try { renderStatsHistory(); } catch (error) { console.error(error); setHistoryMessage('No se pudieron cargar las estadísticas mensuales.', 'error'); }
         function toggleDia(fecha) {
             const card = document.getElementById('dia-' + fecha);
             if (card) card.classList.toggle('abierto');
@@ -825,7 +937,7 @@ HTML_EDIT = """
 <div class="page">
     <div class="topbar">
         <h2>✏️ Editar local N° {{ registro.numero }}</h2>
-        <div class="navlinks"><a href="{{ url_for('dashboard') }}">📊 Volver</a></div>
+        <div class="navlinks"><a href="{{ url_for('dashboard') }}">📊 Volver</a><a href="{{ url_for('estadisticas') }}">📈 Estadísticas</a></div>
     </div>
 
     {% with messages = get_flashed_messages() %}
@@ -892,6 +1004,379 @@ HTML_EDIT = """
         }
         """ + ZOOM_JS + """
     </script>
+</body>
+</html>
+"""
+
+
+HTML_STATS = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estadísticas</title>
+    <style>""" + BASE_CSS + """
+        .stats-shell{ max-width:1140px; margin:0 auto; }
+        .stats-heading{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
+        .stats-heading h1{ font-size:24px; margin:0 0 5px; letter-spacing:-.02em; }
+        .stats-heading p{ margin:0; color:var(--ink-600); font-size:13.5px; }
+        .stats-form-card{ margin-bottom:18px; }
+        .section-toggle{ width:100%; display:flex; justify-content:space-between; align-items:center; gap:12px;
+            border:0; background:none; padding:0; cursor:pointer; color:var(--ink-900); font:inherit; text-align:left; }
+        .section-toggle h2{ font-size:17px; }
+        .toggle-mark{ width:30px; height:30px; border:1px solid var(--line); border-radius:8px; display:inline-flex;
+            align-items:center; justify-content:center; color:var(--ink-600); font-size:16px; }
+        .stats-form{ border-top:1px solid var(--line); margin-top:16px; padding-top:18px; }
+        .hear-question{ font-size:15px; font-weight:700; color:var(--ink-900); margin:0 0 10px; }
+        .hear-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+        .hear-btn{ border:1px solid var(--line); background:var(--surface); color:var(--ink-700); border-radius:8px;
+            padding:10px 20px; cursor:pointer; font-size:14px; font-weight:700; min-width:90px; transition:transform .16s ease, box-shadow .16s ease, background .16s ease; }
+        .hear-btn:hover{ background:var(--paper); transform:translateY(-2px); box-shadow:0 7px 14px rgba(20,25,30,.08); }
+        .hear-btn:active,.counter-btn:active,.add-btn:active,.small-action:active,.score-btn:active{ transform:scale(.95); }
+        .hear-btn.yes:hover, .hear-btn.yes.active{ background:var(--green-100); border-color:#b8dfc8; color:var(--green-700); }
+        .hear-btn.no:hover, .hear-btn.no.active{ background:var(--red-100); border-color:#efc7c2; color:var(--red-700); }
+        .stats-form-grid{ display:grid; grid-template-columns:minmax(220px,.7fr) minmax(260px,1.3fr); gap:18px; margin-top:18px; }
+        .counter-control{ display:flex; align-items:center; gap:10px; }
+        .counter-value{ min-width:58px; text-align:center; font-size:22px; font-weight:800; color:var(--ink-900); }
+        .counter-btn{ width:36px; height:36px; border:1px solid var(--line); background:var(--surface); border-radius:8px;
+            cursor:pointer; font-size:20px; line-height:1; color:var(--ink-700); transition:transform .16s ease, background .16s ease, box-shadow .16s ease; }
+        .counter-btn:hover{ background:var(--paper); transform:translateY(-2px); box-shadow:0 5px 10px rgba(20,25,30,.08); }
+        .objection-input{ display:flex; gap:8px; }
+        .objection-input input{ flex:1; min-width:0; }
+        .add-btn{ border:0; border-radius:8px; background:var(--brand-600); color:#fff; padding:0 15px; cursor:pointer; font-weight:700; transition:transform .16s ease, background .16s ease, box-shadow .16s ease; }
+        .add-btn:hover{ background:var(--brand-700); transform:translateY(-2px); box-shadow:0 7px 14px rgba(11,110,153,.2); }
+        .form-hint{ color:var(--ink-600); font-size:12px; margin:6px 0 0; }
+        .action-message{ min-height:20px; margin-top:14px; padding:0; font-size:12.5px; font-weight:600; transition:opacity .2s ease, transform .2s ease; }
+        .action-message.success{ color:var(--green-700); }
+        .action-message.error{ color:var(--red-700); }
+        .action-message.loading{ color:var(--brand-700); }
+        .is-loading{ opacity:.62; cursor:wait !important; pointer-events:none; }
+        .stats-grid{ display:grid; grid-template-columns:repeat(12, 1fr); gap:18px; }
+        .stats-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-card); transition:transform .2s ease, box-shadow .2s ease; }
+        .stats-card:hover{ transform:translateY(-2px); box-shadow:0 12px 26px rgba(20,25,30,.09); }
+        .overview-card{ grid-column:span 4; text-align:center; }
+        .wide-card{ grid-column:span 8; }
+        .full-card{ grid-column:1 / -1; }
+        .stats-card h2{ font-size:16px; margin-bottom:4px; }
+        .stats-card-subtitle{ color:var(--ink-600); font-size:12.5px; margin:0 0 16px; }
+        .donut{ width:172px; height:172px; margin:6px auto 15px; border-radius:50%; display:grid; place-items:center;
+            --ratio:var(--yes, 0%); --donut-primary:var(--green-600); --donut-secondary:var(--red-600);
+            background:conic-gradient(var(--donut-primary) 0 var(--ratio), var(--donut-secondary) var(--ratio) 100%); position:relative; transition:background .5s ease; }
+        .donut::after{ content:""; position:absolute; inset:19px; border-radius:50%; background:var(--surface); }
+        .donut-value{ position:relative; z-index:1; font-size:29px; font-weight:800; color:var(--ink-900); }
+        .donut-legend{ display:flex; justify-content:center; gap:16px; color:var(--ink-700); font-size:13px; font-weight:700; }
+        .legend-dot{ width:9px; height:9px; display:inline-block; border-radius:50%; margin-right:5px; }
+        .legend-yes{ background:var(--green-600); } .legend-no{ background:var(--red-600); }
+        .sales-card{ grid-column:span 8; }
+        .sales-chart-grid{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:18px; }
+        .sales-chart{ min-width:0; text-align:center; padding:4px 8px 0; }
+        .sales-chart h3{ margin:0; font-size:13.5px; color:var(--ink-900); }
+        .sales-donut{ width:142px; height:142px; margin:14px auto 12px; --ratio:0%; }
+        .sales-donut::after{ inset:16px; }
+        .sales-donut .donut-value{ font-size:24px; }
+        .sales-chart-note{ margin:0; font-size:12px; line-height:1.45; color:var(--ink-600); }
+        .chart-note{ margin:0; font-size:12px; color:var(--ink-600); }
+        .section-head{ display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+        .sort-control{ display:flex; align-items:center; gap:8px; color:var(--ink-600); font-size:12.5px; }
+        .sort-control select{ width:auto; min-width:165px; padding:8px 28px 8px 10px; font-size:12.5px; }
+        .objection-grid{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px; }
+        .objection-card{ border:1px solid var(--line); border-radius:10px; padding:14px; min-width:0; background:#fff; animation:cardIn .25s ease both; transition:transform .16s ease, box-shadow .16s ease; }
+        .objection-card:hover{ transform:translateY(-2px); box-shadow:0 7px 16px rgba(20,25,30,.07); }
+        .objection-title{ min-height:38px; color:var(--ink-900); font-size:13.5px; font-weight:700; line-height:1.35; overflow-wrap:anywhere; }
+        .objection-score{ display:flex; align-items:center; gap:8px; margin:13px 0 12px; }
+        .score-btn{ width:28px; height:28px; border:1px solid var(--line); border-radius:7px; background:var(--surface); cursor:pointer; font-size:17px; color:var(--ink-700); }
+        .score-btn:hover{ background:var(--paper); }
+        .score-number{ min-width:28px; text-align:center; font-weight:800; }
+        .objection-actions{ display:flex; gap:6px; }
+        .small-action{ flex:1; border:1px solid var(--line); background:var(--surface); color:var(--ink-600); border-radius:7px; padding:7px 5px; cursor:pointer; font-size:11.5px; font-weight:700; }
+        .small-action:hover{ background:var(--paper); }
+        .small-action.delete{ color:var(--red-600); }
+        .edit-objection{ width:100%; margin-bottom:8px; }
+        .empty-stats{ grid-column:1 / -1; color:var(--ink-600); font-size:13px; padding:12px 0 2px; }
+        .value-pulse{ animation:valuePulse .34s ease; }
+        @keyframes valuePulse{ 0%{ transform:scale(1); } 45%{ transform:scale(1.12); color:var(--brand-700); } 100%{ transform:scale(1); } }
+        @keyframes cardIn{ from{ opacity:0; transform:translateY(5px); } to{ opacity:1; transform:translateY(0); } }
+        @media (max-width: 900px){ .overview-card{ grid-column:span 5; } .sales-card{ grid-column:span 7; } .objection-grid{ grid-template-columns:repeat(3, minmax(0,1fr)); } }
+        @media (max-width: 680px){ .stats-heading{ display:block; } .stats-heading .navlinks{ margin-top:12px; } .stats-form-grid{ grid-template-columns:1fr; } .overview-card,.sales-card{ grid-column:1 / -1; } .objection-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+        @media (max-width: 430px){ .sales-chart-grid{ grid-template-columns:1fr; } }
+        @media (max-width: 430px){ .objection-grid{ grid-template-columns:1fr; } .objection-input{ display:grid; grid-template-columns:1fr auto; } }
+    </style>
+</head>
+<body>
+<main class="stats-shell">
+    <div class="stats-heading">
+        <div>
+            <h1>📈 Estadísticas</h1>
+            <p>Registrá cada visita y convertí tus datos en decisiones.</p>
+        </div>
+        <div class="navlinks">
+            <a href="{{ url_for('index') }}">➕ Nuevo registro</a>
+            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+            <a href="{{ url_for('lista') }}">🗂️ Lista</a>
+            <a href="{{ url_for('logout') }}">🚪 Salir ({{ session['usuario'] }})</a>
+        </div>
+    </div>
+
+    <section class="card stats-form-card">
+        <button type="button" class="section-toggle" id="formToggle" aria-expanded="true">
+            <h2>Registrar visita</h2><span class="toggle-mark" id="toggleMark">⌃</span>
+        </button>
+        <div class="stats-form" id="statsForm">
+            <p class="hear-question">¿El cliente te escuchó?</p>
+            <div class="hear-actions">
+                <button type="button" class="hear-btn yes stats-action" onclick="registrarRespuesta('yes')">Sí</button>
+                <button type="button" class="hear-btn no stats-action" onclick="registrarRespuesta('no')">No</button>
+            </div>
+            <div class="stats-form-grid">
+                <div>
+                    <label>Ventas obtenidas</label>
+                    <div class="counter-control">
+                        <button type="button" class="counter-btn stats-action" onclick="cambiarVentas(-1)" aria-label="Restar venta">−</button>
+                        <span class="counter-value" id="salesValue">0</span>
+                        <button type="button" class="counter-btn stats-action" onclick="cambiarVentas(1)" aria-label="Sumar venta">+</button>
+                    </div>
+                    <p class="form-hint">Este total se usa en los dos gráficos de ventas.</p>
+                </div>
+                <div>
+                    <label for="objectionInput">Lista de objeciones</label>
+                    <div class="objection-input">
+                        <input type="text" id="objectionInput" placeholder="Ej: Lo tengo que consultar" maxlength="120">
+                        <button type="button" class="add-btn stats-action" onclick="agregarObjecion()">Agregar</button>
+                    </div>
+                    <p class="form-hint">Es opcional. Si repetís una objeción, suma un punto en la misma tarjeta.</p>
+                </div>
+            </div>
+            <div id="actionMessage" class="action-message" role="status" aria-live="polite"></div>
+        </div>
+    </section>
+
+    <section class="stats-grid">
+        <article class="stats-card overview-card">
+            <h2>Clientes que escucharon</h2>
+            <p class="stats-card-subtitle">Porcentaje de respuestas Sí sobre el total</p>
+            <div class="donut" id="heardDonut" style="--yes:0%;"><span class="donut-value" id="heardPercent">0%</span></div>
+            <div class="donut-legend"><span><i class="legend-dot legend-yes"></i>SI: <b id="yesCount">0</b></span><span><i class="legend-dot legend-no"></i>NO: <b id="noCount">0</b></span></div>
+        </article>
+        <article class="stats-card sales-card">
+            <h2>Ventas obtenidas</h2>
+            <p class="stats-card-subtitle">Rendimiento según las visitas registradas</p>
+            <div class="sales-chart-grid">
+                <div class="sales-chart">
+                    <h3>Potencial de venta</h3>
+                    <div class="donut sales-donut" id="potentialDonut" style="--ratio:0%;--donut-primary:var(--brand-600);--donut-secondary:var(--brand-100);"><span class="donut-value" id="potentialValue">0%</span></div>
+                    <p class="sales-chart-note" id="potentialNote">0 ventas / 0 clientes escucharon</p>
+                </div>
+                <div class="sales-chart">
+                    <h3>Estadística en bruto de venta</h3>
+                    <div class="donut sales-donut" id="rawDonut" style="--ratio:0%;--donut-primary:var(--amber-600);--donut-secondary:var(--amber-100);"><span class="donut-value" id="rawValue">0%</span></div>
+                    <p class="sales-chart-note" id="rawNote">0 ventas / 0 locales visitados</p>
+                </div>
+            </div>
+        </article>
+        <article class="stats-card full-card">
+            <div class="section-head"><div><h2>Lista de objeciones</h2><p class="stats-card-subtitle">Puntualas para conocer las más frecuentes.</p></div><label class="sort-control" for="sortSelect">Ordenar por <select id="sortSelect"><option value="common">Más común</option><option value="least">Menos común</option><option value="newest">Más reciente</option><option value="oldest">Más antigua</option></select></label></div>
+            <div class="objection-grid" id="objectionGrid"></div>
+        </article>
+    </section>
+</main>
+<script>
+const storageKey = 'gednet-estadisticas-v1-' + {{ usuario|tojson }};
+const historyKey = 'gednet-estadisticas-historial-v1-' + {{ usuario|tojson }};
+const defaultStats = { yes: 0, no: 0, sales: 0, objections: [], periodMonth: '' };
+let stats = cargarStats();
+let sortMode = 'common';
+let editingId = null;
+
+function cargarStats() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(storageKey));
+        return prepararPeriodo({ ...defaultStats, ...(saved || {}), objections: Array.isArray(saved && saved.objections) ? saved.objections : [] });
+    } catch (error) { return { ...defaultStats, objections: [] }; }
+}
+function periodoActual() { const now = new Date(); return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'); }
+function prepararPeriodo(current) {
+    const month = periodoActual();
+    if (!current.periodMonth) { current.periodMonth = month; localStorage.setItem(storageKey, JSON.stringify(current)); return current; }
+    if (current.periodMonth === month) return current;
+    let history = [];
+    try { const savedHistory = JSON.parse(localStorage.getItem(historyKey)); history = Array.isArray(savedHistory) ? savedHistory : []; } catch (error) {}
+    history = history.filter(item => item.month !== current.periodMonth);
+    history.unshift({ month: current.periodMonth, stats: { yes: Number(current.yes || 0), no: Number(current.no || 0), sales: Number(current.sales || 0), objections: current.objections || [] }, savedAt: new Date().toISOString() });
+    localStorage.setItem(historyKey, JSON.stringify(history));
+    const reset = { ...defaultStats, periodMonth: month };
+    localStorage.setItem(storageKey, JSON.stringify(reset));
+    return reset;
+}
+let busyTimer = null;
+function setMessage(text, type) { const box = document.getElementById('actionMessage'); if (!box) return; box.textContent = text; box.className = 'action-message ' + (type || ''); }
+function setBusy(isBusy) {
+    document.querySelectorAll('.stats-action, #objectionGrid button').forEach(button => {
+        button.disabled = isBusy;
+        button.classList.toggle('is-loading', isBusy);
+    });
+}
+function guardarStats() {
+    try { localStorage.setItem(storageKey, JSON.stringify(stats)); return true; }
+    catch (error) { setMessage('No se pudo guardar. Revisá el almacenamiento del navegador.', 'error'); return false; }
+}
+function guardarCambio(cambio, mensaje) {
+    setBusy(true); setMessage('Guardando cambios...', 'loading');
+    try {
+        cambio();
+        if (!guardarStats()) throw new Error('localStorage no disponible');
+        render();
+        setMessage(mensaje, 'success');
+    } catch (error) { console.error(error); setMessage('Ocurrió un error y el cambio no se pudo guardar.', 'error'); }
+    setBusy(true);
+    clearTimeout(busyTimer);
+    busyTimer = setTimeout(() => setBusy(false), 260);
+}
+function normalizar(texto) { return String(texto || '').trim().toLocaleLowerCase(); }
+function pulso(...ids) { ids.forEach(id => { const element = document.getElementById(id); if (!element) return; element.classList.remove('value-pulse'); void element.offsetWidth; element.classList.add('value-pulse'); }); }
+function cambiarVentas(delta) { guardarCambio(() => { stats.sales = Math.max(0, Number(stats.sales || 0) + delta); }, 'Ventas actualizadas correctamente.'); pulso('salesValue', 'potentialValue', 'rawValue'); }
+function registrarRespuesta(respuesta) { guardarCambio(() => { stats[respuesta] = Number(stats[respuesta] || 0) + 1; }, 'Respuesta registrada correctamente.'); pulso('heardPercent', 'yesCount', 'noCount', 'potentialValue', 'rawValue'); }
+function agregarObjecion() {
+    const input = document.getElementById('objectionInput');
+    const texto = input.value.trim();
+    if (!texto) { setMessage('Escribí una objeción antes de agregarla.', 'error'); input.focus(); return; }
+    guardarCambio(() => {
+        const existente = stats.objections.find(item => normalizar(item.text) === normalizar(texto));
+        if (existente) existente.count = Number(existente.count || 0) + 1;
+        else stats.objections.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2), text: texto, count: 1, createdAt: Date.now() });
+        input.value = '';
+    }, 'Objeción guardada correctamente.');
+    input.focus();
+}
+function cambiarPuntos(id, delta) { const item = stats.objections.find(item => item.id === id); if (!item) return; guardarCambio(() => { item.count = Math.max(0, Number(item.count || 0) + delta); }, 'Puntaje actualizado.'); }
+function borrarObjecion(id) { if (!confirm('¿Eliminar esta objeción?')) return; guardarCambio(() => { stats.objections = stats.objections.filter(item => item.id !== id); }, 'Objeción eliminada.'); }
+function iniciarEdicion(id) { editingId = id; render(); const input = document.querySelector('[data-edit-id="' + id + '"]'); if (input) { input.focus(); input.select(); } }
+function cancelarEdicion() { editingId = null; render(); }
+function guardarEdicion(id) {
+    const input = document.querySelector('[data-edit-id="' + id + '"]');
+    const item = stats.objections.find(entry => entry.id === id);
+    if (!input || !item || !input.value.trim()) return;
+    const duplicada = stats.objections.find(entry => entry.id !== id && normalizar(entry.text) === normalizar(input.value));
+    if (duplicada) { duplicada.count = Number(duplicada.count || 0) + Number(item.count || 0); stats.objections = stats.objections.filter(entry => entry.id !== id); }
+    else item.text = input.value.trim();
+    editingId = null; guardarCambio(() => {}, 'Objeción actualizada correctamente.');
+}
+function alternarFormulario() { const form = document.getElementById('statsForm'), open = form.hidden; form.hidden = !open; document.getElementById('formToggle').setAttribute('aria-expanded', String(open)); document.getElementById('toggleMark').textContent = open ? '⌃' : '⌄'; }
+function ordenar(items) {
+    return [...items].sort((a, b) => {
+        if (sortMode === 'least') return Number(a.count) - Number(b.count) || b.createdAt - a.createdAt;
+        if (sortMode === 'newest') return b.createdAt - a.createdAt;
+        if (sortMode === 'oldest') return a.createdAt - b.createdAt;
+        return Number(b.count) - Number(a.count) || b.createdAt - a.createdAt;
+    });
+}
+function renderObjections() {
+    const grid = document.getElementById('objectionGrid');
+    const items = ordenar(stats.objections);
+    grid.innerHTML = '';
+    if (!items.length) {
+        grid.innerHTML = '<div class="empty-stats">Todavía no hay objeciones guardadas.</div>';
+        return;
+    }
+    items.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'objection-card';
+
+        if (editingId === item.id) {
+            const input = document.createElement('input');
+            input.className = 'edit-objection';
+            input.value = item.text;
+            input.maxLength = 120;
+            input.dataset.editId = item.id;
+
+            const actions = document.createElement('div');
+            actions.className = 'objection-actions';
+
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'small-action';
+            saveBtn.textContent = 'Guardar';
+            saveBtn.addEventListener('click', () => guardarEdicion(item.id));
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'small-action';
+            cancelBtn.textContent = 'Cancelar';
+            cancelBtn.addEventListener('click', cancelarEdicion);
+
+            actions.append(saveBtn, cancelBtn);
+            card.append(input, actions);
+        } else {
+            const title = document.createElement('div');
+            title.className = 'objection-title';
+            title.textContent = item.text;
+
+            const score = document.createElement('div');
+            score.className = 'objection-score';
+
+            const minusBtn = document.createElement('button');
+            minusBtn.className = 'score-btn';
+            minusBtn.textContent = '−';
+            minusBtn.setAttribute('aria-label', 'Restar punto');
+            minusBtn.addEventListener('click', () => cambiarPuntos(item.id, -1));
+
+            const scoreNum = document.createElement('span');
+            scoreNum.className = 'score-number';
+            scoreNum.textContent = Number(item.count || 0);
+
+            const plusBtn = document.createElement('button');
+            plusBtn.className = 'score-btn';
+            plusBtn.textContent = '+';
+            plusBtn.setAttribute('aria-label', 'Sumar punto');
+            plusBtn.addEventListener('click', () => cambiarPuntos(item.id, 1));
+
+            score.append(minusBtn, scoreNum, plusBtn);
+
+            const actions = document.createElement('div');
+            actions.className = 'objection-actions';
+
+            const editBtn = document.createElement('button');
+            editBtn.className = 'small-action';
+            editBtn.textContent = 'Editar';
+            editBtn.addEventListener('click', () => iniciarEdicion(item.id));
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'small-action delete';
+            delBtn.textContent = 'Eliminar';
+            delBtn.addEventListener('click', () => borrarObjecion(item.id));
+
+            actions.append(editBtn, delBtn);
+            card.append(title, score, actions);
+        }
+        grid.appendChild(card);
+    });
+}
+function escapar(texto) { return String(texto).replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char])); }
+function render() {
+    const yes = Number(stats.yes || 0), no = Number(stats.no || 0), total = yes + no, sales = Number(stats.sales || 0);
+    const yesPct = total ? Math.round((yes / total) * 100) : 0;
+    const potential = yes ? (sales / yes) * 100 : 0, raw = total ? (sales / total) * 100 : 0;
+    document.getElementById('salesValue').textContent = sales;
+    document.getElementById('yesCount').textContent = yes; document.getElementById('noCount').textContent = no;
+    document.getElementById('heardPercent').textContent = yesPct + '%';
+    const donut = document.getElementById('heardDonut'); donut.style.setProperty('--yes', yesPct + '%'); donut.style.background = total ? '' : 'conic-gradient(#d9dfdd 0 100%)';
+    document.getElementById('potentialValue').textContent = Math.round(potential) + '%'; document.getElementById('rawValue').textContent = Math.round(raw) + '%';
+    document.getElementById('potentialDonut').style.setProperty('--ratio', Math.min(100, potential) + '%'); document.getElementById('rawDonut').style.setProperty('--ratio', Math.min(100, raw) + '%');
+    document.getElementById('potentialNote').textContent = sales + ' ventas / ' + yes + ' clientes escucharon'; document.getElementById('rawNote').textContent = sales + ' ventas / ' + total + ' locales visitados';
+    renderObjections();
+}
+document.getElementById('sortSelect').addEventListener('change', event => { sortMode = event.target.value; renderObjections(); });
+document.getElementById('objectionInput').addEventListener('keydown', event => { if (event.key === 'Enter') agregarObjecion(); });
+window.cambiarVentas = cambiarVentas;
+window.registrarRespuesta = registrarRespuesta;
+window.agregarObjecion = agregarObjecion;
+window.cambiarPuntos = cambiarPuntos;
+window.borrarObjecion = borrarObjecion;
+window.iniciarEdicion = iniciarEdicion;
+window.cancelarEdicion = cancelarEdicion;
+window.guardarEdicion = guardarEdicion;
+document.getElementById('formToggle').addEventListener('click', alternarFormulario);
+window.addEventListener('error', event => { console.error(event.error || event.message); setMessage('La herramienta encontró un error. Recargá la página e intentá nuevamente.', 'error'); setBusy(false); });
+try { render(); } catch (error) { console.error(error); setMessage('No se pudieron cargar las estadísticas guardadas.', 'error'); }
+</script>
 </body>
 </html>
 """
