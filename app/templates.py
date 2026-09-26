@@ -114,12 +114,13 @@ HTML_LOGIN = """
 # ============================================================================
 BASE_CSS = """
 :root{
-    --ink-900:#1A2027; --ink-700:#333D45; --ink-600:#57626C; --ink-300:#A6AFB6;
-    --paper:#F1F4F3; --surface:#FFFFFF; --line:#E3E7E6;
-    --brand-600:#0B6E99; --brand-700:#095777; --brand-100:#E4F1F6;
-    --amber-600:#B4720A; --amber-700:#8F5B08; --amber-100:#FBEBD2; --amber-200:#F3D8A4;
-    --green-600:#1E8A5D; --green-700:#166B48; --green-100:#DFF3E7;
-    --red-600:#C1352B; --red-700:#9C2A22; --red-100:#F8E1DE;
+    --ink-900:#17212B; --ink-700:#344352; --ink-600:#667482; --ink-300:#A8B2BC;
+    --paper:#F3F5F7; --surface:#FFFFFF; --line:#DCE3E8;
+    --nav-bg:#07090C; --nav-line:#202932; --nav-muted:#AAB4BF;
+    --brand-600:#1F5F8B; --brand-700:#17496C; --brand-100:#E9F2F8;
+    --amber-600:#A66A08; --amber-700:#805207; --amber-100:#FBF0D7; --amber-200:#E9C982;
+    --green-600:#21855A; --green-700:#176443; --green-100:#E2F3E9;
+    --red-600:#C0392F; --red-700:#962D26; --red-100:#FBE5E2;
     --radius-sm:8px; --radius-md:12px; --radius-lg:16px;
     --shadow-card:0 1px 2px rgba(20,25,30,.04), 0 8px 20px rgba(20,25,30,.06);
 }
@@ -134,9 +135,16 @@ a{ color:var(--brand-600); }
 h2{ font-size:19px; font-weight:700; letter-spacing:-0.01em; margin:0; color:var(--ink-900); }
 .page{ max-width:560px; margin:0 auto; }
 .page-wide{ max-width:1140px; margin:0 auto; }
-.topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap; }
-.navlinks{ display:flex; gap:14px; flex-wrap:wrap; }
-.navlinks a{ text-decoration:none; font-weight:600; font-size:13.5px; display:inline-flex; align-items:center; gap:6px; }
+.topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; gap:18px; flex-wrap:wrap;
+    background:var(--nav-bg); color:#fff; padding:14px 16px; border:1px solid var(--nav-line); border-radius:12px;
+    box-shadow:0 8px 18px rgba(13,17,23,.12); }
+.topbar h2{ color:#fff; font-size:17px; letter-spacing:0; }
+.navlinks{ display:flex; gap:7px; flex-wrap:wrap; align-items:center; }
+.navlinks a{ text-decoration:none; font-weight:650; font-size:12.5px; display:inline-flex; align-items:center; gap:6px;
+    color:var(--brand-600); border-radius:7px; padding:8px 10px; transition:background .16s ease, color .16s ease, transform .16s ease; }
+.navlinks a:hover{ background:var(--brand-100); color:var(--brand-700); transform:translateY(-1px); }
+.topbar .navlinks a{ color:#fff; border:1px solid transparent; }
+.topbar .navlinks a:hover{ background:#1A2530; color:#fff; border-color:#334554; }
 .contador-wrap{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md);
     padding:13px 16px; margin-bottom:18px; box-shadow:var(--shadow-card); }
 .contador-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
@@ -211,6 +219,41 @@ button{ font-family:inherit; }
 .zoom-close{ position:fixed; top:16px; right:18px; color:#fff; font-size:22px; cursor:pointer; z-index:1001;
     width:36px; height:36px; display:flex; align-items:center; justify-content:center;
     background:rgba(255,255,255,.14); border-radius:50%; line-height:1; }
+
+/* Corporate system: restrained contrast, clear hierarchy and dense work surfaces. */
+body{
+    background-color:#0B0E12;
+    background-image:
+        linear-gradient(116deg, rgba(255,255,255,.035) 0%, rgba(255,255,255,0) 30%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.026) 0, rgba(255,255,255,.026) 1px, transparent 1px, transparent 5px),
+        repeating-linear-gradient(45deg, rgba(255,255,255,.014) 0, rgba(255,255,255,.014) 1px, transparent 1px, transparent 5px);
+    background-attachment:fixed;
+    padding:28px 22px 72px;
+}
+.login-head h2{ color:#F4F7FA; }
+.login-head .login-sub{ color:#AAB4BF; }
+.login-foot{ color:#8C98A5; }
+.page,.page-wide{ width:100%; }
+.page-wide{ max-width:1180px; }
+.page{ max-width:640px; }
+.topbar{ min-height:58px; padding:12px 14px 12px 18px; border-radius:10px; }
+.topbar h2{ font-weight:700; letter-spacing:-.01em; }
+.navlinks a{ font-size:12px; letter-spacing:.01em; }
+.contador-wrap,.card{ border-radius:10px; box-shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 24px rgba(16,24,40,.05); }
+.contador-wrap{ padding:16px 18px; }
+.card{ padding:24px; }
+.field{ margin-bottom:20px; }
+label{ color:var(--ink-900); font-size:12px; letter-spacing:.015em; text-transform:uppercase; }
+input[type="text"], input[type="password"], input[type="number"], input[type="file"], input[type="time"], select{
+    min-height:42px; border-color:#CBD5DE; border-radius:7px; box-shadow:inset 0 1px 1px rgba(16,24,40,.02); }
+input:focus, select:focus{ border-color:var(--brand-600); box-shadow:0 0 0 3px rgba(31,95,139,.14); }
+.btn-primary{ min-height:44px; border-radius:7px; box-shadow:0 4px 10px rgba(31,95,139,.16); }
+.btn-primary:hover{ transform:translateY(-1px); box-shadow:0 7px 16px rgba(31,95,139,.2); }
+.photo-action,.icon-action{ border-radius:7px; min-height:42px; transition:background .16s ease, border-color .16s ease, transform .16s ease; }
+.photo-action:hover,.icon-action:hover{ border-color:var(--brand-600); color:var(--brand-700); transform:translateY(-1px); }
+.alert{ border-radius:7px; box-shadow:0 2px 8px rgba(16,24,40,.04); }
+.empty{ border-radius:10px; background:#fff; }
+@media (max-width:760px){ body{ padding:16px 12px 48px; } .topbar{ align-items:flex-start; } .topbar .navlinks{ width:100%; } .topbar .navlinks a{ flex:1 1 auto; justify-content:center; } .card{ padding:18px; } }
 """
 
 ZOOM_JS = """
@@ -257,10 +300,11 @@ HTML_FORM = """
     <div class="topbar">
         <h2>Registro de local</h2>
         <div class="navlinks">
-            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
-            <a href="{{ url_for('estadisticas') }}">📈 Estadísticas</a>
-            <a href="{{ url_for('lista') }}">🗂️ Lista</a>
-            <a href="{{ url_for('logout') }}">🚪 Salir ({{ session['usuario'] }})</a>
+            <a href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('estadisticas') }}">Estadísticas</a>
+            <a href="{{ url_for('lista') }}">Lista</a>
+            <a href="{{ url_for('perfil') }}">Perfil</a>
+            <a href="{{ url_for('logout') }}">Cerrar sesión</a>
         </div>
     </div>
 
@@ -315,8 +359,8 @@ HTML_FORM = """
             <div class="field">
                 <label>Foto del local</label>
                 <div class="photo-actions">
-                    <button type="button" class="photo-action" onclick="abrirSelectorFoto('archivo')">🖼️ Seleccionar foto</button>
-                    <button type="button" class="photo-action" onclick="abrirSelectorFoto('camara')">📷 Sacar foto</button>
+                    <button type="button" class="photo-action" onclick="abrirSelectorFoto('archivo')">Seleccionar foto</button>
+                    <button type="button" class="photo-action" onclick="abrirSelectorFoto('camara')">Usar cámara</button>
                 </div>
                 <input type="file" name="foto" id="fotoInput" class="file-hidden" accept="image/*" required onchange="mostrarPreview(event)">
                 <div class="field-status" id="fotoStatus">Elegí una foto guardada o sacá una nueva.</div>
@@ -443,17 +487,17 @@ HTML_DASHBOARD = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Locales</title>
     <style>""" + BASE_CSS + """
-        .table-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg);
-            overflow:visible; box-shadow:var(--shadow-card); }
+        .table-card{ background:var(--surface); border:1px solid var(--line); border-radius:10px;
+            overflow:visible; box-shadow:0 1px 2px rgba(16,24,40,.04), 0 10px 26px rgba(16,24,40,.06); }
         table{ width:100%; border-collapse:collapse; }
-        th{ background:var(--paper); color:var(--ink-600); text-align:left; font-size:12px; font-weight:700;
+        th{ background:#F6F8FA; color:var(--ink-600); text-align:left; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
             padding:12px 14px; border-bottom:1px solid var(--line); }
         th:first-child{ border-top-left-radius:var(--radius-lg); }
         th:last-child{ border-top-right-radius:var(--radius-lg); }
         td{ padding:11px 14px; font-size:13.5px; border-bottom:1px solid var(--line); color:var(--ink-700);
             vertical-align:middle; position:relative; }
         tr:last-child td{ border-bottom:none; }
-        tr:hover td{ background:#FAFBFB; }
+        tr:hover td{ background:#F7FAFC; }
         .thumb{ width:42px; height:42px; object-fit:cover; border-radius:8px; border:1px solid var(--line);
             cursor:zoom-in; display:block; }
         .countdown{ font-size:11px; color:var(--ink-600); margin-top:2px; }
@@ -509,12 +553,13 @@ HTML_DASHBOARD = """
 <body>
 <div class="page-wide">
     <div class="topbar">
-        <h2>📊 Dashboard de locales</h2>
+        <h2>Dashboard de locales</h2>
         <div class="navlinks">
-            <a href="{{ url_for('index') }}">➕ Nuevo registro</a>
-            <a href="{{ url_for('lista') }}">🗂️ Lista de locales</a>
-            <a href="{{ url_for('estadisticas') }}">📈 Estadísticas</a>
-            <a href="{{ url_for('logout') }}">🚪 Salir ({{ session['usuario'] }})</a>
+            <a href="{{ url_for('index') }}">Nuevo registro</a>
+            <a href="{{ url_for('lista') }}">Lista de locales</a>
+            <a href="{{ url_for('estadisticas') }}">Estadísticas</a>
+            <a href="{{ url_for('perfil') }}">Perfil</a>
+            <a href="{{ url_for('logout') }}">Cerrar sesión</a>
         </div>
     </div>
 
@@ -574,7 +619,7 @@ HTML_DASHBOARD = """
                         {% if r.estado == 'pendiente' %}
                         <form method="POST" action="{{ url_for('enviar_ahora', uid=r.uid) }}"
                               onsubmit="return confirmarEnvioManual(this, '¿Enviar el Local N° {{ r.numero }} ahora mismo?');">
-                            <button type="submit" class="btn-pill btn-enviar">📤 Enviar</button>
+                            <button type="submit" class="btn-pill btn-enviar">Enviar</button>
                         </form>
                         {% else %}
                         <span class="btn-pill chip-enviado">✅ Enviado</span>
@@ -582,24 +627,24 @@ HTML_DASHBOARD = """
 
                         <div class="conf-menu">
                             <button type="button" class="btn-pill btn-conf" id="conf-btn-{{ r.uid }}"
-                                    onclick="toggleConf(event, {{ r.uid }})">⚙️ Conf</button>
+                                    onclick="toggleConf(event, {{ r.uid }})">Configuración</button>
                             <div class="conf-panel" id="conf-panel-{{ r.uid }}">
-                                <a class="conf-item" href="{{ url_for('editar', uid=r.uid) }}">✏️ Editar datos</a>
+                                <a class="conf-item" href="{{ url_for('editar', uid=r.uid) }}">Editar datos</a>
                                 <a class="conf-item" target="_blank" rel="noopener"
-                                   href="https://www.google.com/maps/search/?api=1&query={{ r.direccion_url }}">📍 Ver ubicación</a>
+                                   href="https://www.google.com/maps/search/?api=1&query={{ r.direccion_url }}">Ver ubicación</a>
                                 {% if r.estado == 'pendiente' %}
                                 <div class="conf-divider"></div>
                                 <div class="conf-label">Reprogramar envío</div>
                                 <form method="POST" action="{{ url_for('ajustar_hora', uid=r.uid) }}" class="conf-time-row">
                                     <input type="time" id="hora-input-{{ r.uid }}" name="nueva_hora"
                                            value="{{ r.hora_programada[:5] }}" required>
-                                    <button type="submit">Fijar</button>
+                                    <button type="submit">Guardar hora</button>
                                 </form>
                                 {% endif %}
                                 <div class="conf-divider"></div>
                                 <form method="POST" action="{{ url_for('eliminar', uid=r.uid) }}"
                                       onsubmit="return confirm('¿Eliminar el Local N° {{ r.numero }}? Esta acción no se puede deshacer.');">
-                                    <button type="submit" class="conf-item danger">🗑️ Eliminar local</button>
+                                    <button type="submit" class="conf-item danger">Eliminar local</button>
                                 </form>
                             </div>
                         </div>
@@ -607,11 +652,11 @@ HTML_DASHBOARD = """
                         {% if r.estado == 'pendiente' %}
                             {% if r.hora_manual %}
                             <form method="POST" action="{{ url_for('auto_hora', uid=r.uid) }}">
-                                <button type="submit" class="btn-pill btn-manual" title="Volver al reparto automático">🔒 Manual</button>
+                                <button type="submit" class="btn-pill btn-manual" title="Volver al reparto automático">Manual</button>
                             </form>
                             {% else %}
                             <button type="button" class="btn-pill btn-auto" title="Fijar hora manual"
-                                    onclick="abrirConfParaHora({{ r.uid }})">🔄 Auto</button>
+                                    onclick="abrirConfParaHora({{ r.uid }})">Automático</button>
                             {% endif %}
                         {% endif %}
                     </div>
@@ -704,12 +749,12 @@ HTML_LISTA = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lista de Locales</title>
     <style>""" + BASE_CSS + """
-        .dia-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg);
-            box-shadow:var(--shadow-card); margin-bottom:12px; overflow:hidden; }
+        .dia-card{ background:var(--surface); border:1px solid var(--line); border-radius:10px;
+            box-shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 22px rgba(16,24,40,.05); margin-bottom:12px; overflow:hidden; }
         .dia-header{ display:flex; align-items:center; justify-content:space-between; gap:12px;
-            padding:15px 18px; cursor:pointer; user-select:none; background:var(--surface);
+            padding:16px 18px; cursor:pointer; user-select:none; background:var(--surface);
             border:none; width:100%; font-family:inherit; text-align:left; }
-        .dia-header:hover{ background:#FAFBFB; }
+        .dia-header:hover{ background:#F7FAFC; }
         .dia-titulo{ display:flex; align-items:center; gap:10px; }
         .dia-nombre{ font-size:15px; font-weight:700; color:var(--ink-900); }
         .dia-meta{ display:flex; align-items:center; gap:8px; }
@@ -719,7 +764,7 @@ HTML_LISTA = """
         .dia-card.abierto .flecha{ transform:rotate(180deg); }
         .dia-body{ display:none; border-top:1px solid var(--line); padding:6px 14px 14px; }
         .dia-card.abierto .dia-body{ display:block; }
-        .local-row{ display:flex; gap:14px; align-items:flex-start; padding:14px 4px;
+        .local-row{ display:flex; gap:16px; align-items:flex-start; padding:16px 4px;
             border-bottom:1px solid var(--line); }
         .local-row:last-child{ border-bottom:none; }
         .local-foto{ width:62px; height:62px; object-fit:cover; border-radius:10px; border:1px solid var(--line);
@@ -767,12 +812,13 @@ HTML_LISTA = """
 <body>
 <div class="page-wide">
     <div class="topbar">
-        <h2>🗂️ Lista de locales</h2>
+        <h2>Lista de locales</h2>
         <div class="navlinks">
-            <a href="{{ url_for('index') }}">➕ Nuevo registro</a>
-            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
-            <a href="{{ url_for('estadisticas') }}">📈 Estadísticas</a>
-            <a href="{{ url_for('logout') }}">🚪 Salir ({{ session['usuario'] }})</a>
+            <a href="{{ url_for('index') }}">Nuevo registro</a>
+            <a href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('estadisticas') }}">Estadísticas</a>
+            <a href="{{ url_for('perfil') }}">Perfil</a>
+            <a href="{{ url_for('logout') }}">Cerrar sesión</a>
         </div>
     </div>
 
@@ -783,10 +829,10 @@ HTML_LISTA = """
     <section class="stats-history-card">
         <div class="stats-history-head">
             <div>
-                <h3>📊 Estadísticas mensuales</h3>
+                <h3>Estadísticas mensuales</h3>
                 <p>Guardá el período actual o consultá los resultados archivados por mes.</p>
             </div>
-            <button type="button" class="stats-save-button" id="saveStatsMonth">💾 Guardar estadísticas</button>
+            <button type="button" class="stats-save-button" id="saveStatsMonth">Guardar estadísticas</button>
         </div>
         <div id="statsHistoryMessage" class="stats-history-message" role="status" aria-live="polite"></div>
         <div id="statsMonthList" class="stats-month-list"></div>
@@ -828,7 +874,7 @@ HTML_LISTA = """
                     <div class="local-acciones">
                         <form method="POST" action="{{ url_for('reenviar', uid=r.uid) }}"
                               onsubmit="return confirm('¿Re-enviar el Local N° {{ r.numero }} del {{ dia.fecha_larga }} al chat?');">
-                            <button type="submit" class="btn-pill btn-reenviar">🔁 Re-enviar</button>
+                            <button type="submit" class="btn-pill btn-reenviar">Re-enviar</button>
                         </form>
                     </div>
                 </div>
@@ -936,8 +982,8 @@ HTML_EDIT = """
 <body>
 <div class="page">
     <div class="topbar">
-        <h2>✏️ Editar local N° {{ registro.numero }}</h2>
-        <div class="navlinks"><a href="{{ url_for('dashboard') }}">📊 Volver</a><a href="{{ url_for('estadisticas') }}">📈 Estadísticas</a></div>
+        <h2>Editar local N° {{ registro.numero }}</h2>
+        <div class="navlinks"><a href="{{ url_for('dashboard') }}">Volver al dashboard</a><a href="{{ url_for('estadisticas') }}">Estadísticas</a><a href="{{ url_for('perfil') }}">Perfil</a><a href="{{ url_for('logout') }}">Cerrar sesión</a></div>
     </div>
 
     {% with messages = get_flashed_messages() %}
@@ -1019,8 +1065,11 @@ HTML_STATS = """
     <style>""" + BASE_CSS + """
         .stats-shell{ max-width:1140px; margin:0 auto; }
         .stats-heading{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
-        .stats-heading h1{ font-size:24px; margin:0 0 5px; letter-spacing:-.02em; }
-        .stats-heading p{ margin:0; color:var(--ink-600); font-size:13.5px; }
+        .stats-heading h1{ font-size:24px; margin:0 0 5px; letter-spacing:-.02em; color:#F4F7FA; }
+        .stats-heading p{ margin:0; color:#AAB4BF; font-size:13.5px; }
+        .stats-heading .navlinks{ background:var(--nav-bg); border:1px solid var(--nav-line); border-radius:10px; padding:6px; box-shadow:0 8px 18px rgba(13,17,23,.12); }
+        .stats-heading .navlinks a{ color:#fff; }
+        .stats-heading .navlinks a:hover{ background:#1A2530; color:#fff; }
         .stats-form-card{ margin-bottom:18px; }
         .section-toggle{ width:100%; display:flex; justify-content:space-between; align-items:center; gap:12px;
             border:0; background:none; padding:0; cursor:pointer; color:var(--ink-900); font:inherit; text-align:left; }
@@ -1053,7 +1102,7 @@ HTML_STATS = """
         .action-message.loading{ color:var(--brand-700); }
         .is-loading{ opacity:.62; cursor:wait !important; pointer-events:none; }
         .stats-grid{ display:grid; grid-template-columns:repeat(12, 1fr); gap:18px; }
-        .stats-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-card); transition:transform .2s ease, box-shadow .2s ease; }
+        .stats-card{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:22px; box-shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 22px rgba(16,24,40,.05); transition:transform .2s ease, box-shadow .2s ease; }
         .stats-card:hover{ transform:translateY(-2px); box-shadow:0 12px 26px rgba(20,25,30,.09); }
         .overview-card{ grid-column:span 4; text-align:center; }
         .wide-card{ grid-column:span 8; }
@@ -1107,14 +1156,15 @@ HTML_STATS = """
 <main class="stats-shell">
     <div class="stats-heading">
         <div>
-            <h1>📈 Estadísticas</h1>
+            <h1>Estadísticas</h1>
             <p>Registrá cada visita y convertí tus datos en decisiones.</p>
         </div>
         <div class="navlinks">
-            <a href="{{ url_for('index') }}">➕ Nuevo registro</a>
-            <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
-            <a href="{{ url_for('lista') }}">🗂️ Lista</a>
-            <a href="{{ url_for('logout') }}">🚪 Salir ({{ session['usuario'] }})</a>
+            <a href="{{ url_for('index') }}">Nuevo registro</a>
+            <a href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('lista') }}">Lista</a>
+            <a href="{{ url_for('perfil') }}">Perfil</a>
+            <a href="{{ url_for('logout') }}">Cerrar sesión</a>
         </div>
     </div>
 
@@ -1376,6 +1426,138 @@ window.guardarEdicion = guardarEdicion;
 document.getElementById('formToggle').addEventListener('click', alternarFormulario);
 window.addEventListener('error', event => { console.error(event.error || event.message); setMessage('La herramienta encontró un error. Recargá la página e intentá nuevamente.', 'error'); setBusy(false); });
 try { render(); } catch (error) { console.error(error); setMessage('No se pudieron cargar las estadísticas guardadas.', 'error'); }
+</script>
+</body>
+</html>
+"""
+
+
+HTML_PROFILE = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil</title>
+    <style>""" + BASE_CSS + """
+        .profile-shell{ max-width:1180px; margin:0 auto; }
+        .profile-layout{ display:grid; grid-template-columns:minmax(280px, .8fr) minmax(0, 1.7fr); gap:18px; align-items:start; }
+        .profile-card,.profile-panel{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:24px;
+            box-shadow:0 1px 2px rgba(16,24,40,.04), 0 10px 26px rgba(16,24,40,.06); }
+        .profile-card{ text-align:center; }
+        .profile-avatar{ width:116px; height:116px; margin:4px auto 18px; border-radius:50%; display:grid; place-items:center;
+            background:var(--nav-bg); color:#fff; font-size:36px; font-weight:750; overflow:hidden; border:4px solid #E9F2F8; }
+        .profile-avatar img{ width:100%; height:100%; object-fit:cover; display:none; }
+        .profile-card h1{ margin:0; color:var(--ink-900); font-size:23px; letter-spacing:-.02em; }
+        .profile-email{ margin:6px 0 20px; color:var(--ink-600); font-size:13px; overflow-wrap:anywhere; }
+        .profile-upload{ display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:0 14px;
+            border:1px solid var(--line); border-radius:7px; color:var(--brand-700); background:var(--surface); cursor:pointer;
+            font-size:12.5px; font-weight:700; transition:background .16s ease, border-color .16s ease, transform .16s ease; }
+        .profile-upload:hover{ background:var(--brand-100); border-color:var(--brand-600); transform:translateY(-1px); }
+        .profile-upload input{ display:none; }
+        .profile-status{ min-height:18px; margin-top:10px; color:var(--green-700); font-size:12px; font-weight:600; }
+        .profile-panel h2{ margin:0 0 4px; font-size:17px; }
+        .profile-panel-subtitle{ color:var(--ink-600); margin:0 0 18px; font-size:13px; }
+        .profile-metrics{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
+        .profile-metric{ background:#F6F8FA; border:1px solid #E5EBF0; border-radius:8px; padding:14px; }
+        .profile-metric strong{ display:block; color:var(--ink-900); font-size:24px; line-height:1; }
+        .profile-metric span{ display:block; margin-top:7px; color:var(--ink-600); font-size:11.5px; }
+        .profile-section{ margin-top:20px; padding-top:20px; border-top:1px solid var(--line); }
+        .profile-section h3{ margin:0 0 12px; font-size:14px; }
+        .profile-objections{ display:grid; gap:8px; }
+        .profile-objection{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 12px;
+            border:1px solid var(--line); border-radius:7px; color:var(--ink-700); font-size:13px; }
+        .profile-objection strong{ color:var(--brand-700); font-size:12px; }
+        .profile-empty{ color:var(--ink-600); font-size:12.5px; }
+        @media (max-width:760px){ .profile-layout{ grid-template-columns:1fr; } .profile-metrics{ grid-template-columns:repeat(3, minmax(0,1fr)); } }
+        @media (max-width:430px){ .profile-metrics{ grid-template-columns:1fr; } .profile-metric{ display:flex; justify-content:space-between; align-items:center; } .profile-metric span{ margin-top:0; } }
+    </style>
+</head>
+<body>
+<main class="profile-shell">
+    <div class="topbar">
+        <h2>Perfil</h2>
+        <div class="navlinks">
+            <a href="{{ url_for('index') }}">Nuevo registro</a>
+            <a href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('estadisticas') }}">Estadísticas</a>
+            <a href="{{ url_for('lista') }}">Lista</a>
+            <a href="{{ url_for('logout') }}">Cerrar sesión</a>
+        </div>
+    </div>
+
+    <div class="profile-layout">
+        <section class="profile-card">
+            <div class="profile-avatar" id="profileAvatar"><span id="profileInitials"></span><img id="profilePhoto" alt="Foto de perfil"></div>
+            <h1>{{ usuario }}</h1>
+            <p class="profile-email">{{ email }}</p>
+            <label class="profile-upload">Cambiar foto<input type="file" id="profilePhotoInput" accept="image/*"></label>
+            <div class="profile-status" id="profileStatus" role="status" aria-live="polite"></div>
+        </section>
+
+        <section class="profile-panel">
+            <h2>Resumen de actividad</h2>
+            <p class="profile-panel-subtitle">Tus principales indicadores del período actual.</p>
+            <div class="profile-metrics">
+                <div class="profile-metric"><strong id="profileProspects">{{ total_prospectos }}</strong><span>Total de prospectos</span></div>
+                <div class="profile-metric"><strong id="profileHeard">0</strong><span>Clientes escucharon</span></div>
+                <div class="profile-metric"><strong id="profileSales">0</strong><span>Ventas obtenidas</span></div>
+            </div>
+            <div class="profile-section">
+                <h3>Objeciones frecuentes</h3>
+                <div class="profile-objections" id="profileObjections"></div>
+            </div>
+        </section>
+    </div>
+</main>
+<script>
+const profileStorageKey = 'gednet-perfil-v1-' + {{ usuario|tojson }};
+const profileStatsKey = 'gednet-estadisticas-v1-' + {{ usuario|tojson }};
+const profileInitials = {{ usuario|tojson }}.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase();
+document.getElementById('profileInitials').textContent = profileInitials;
+
+function loadProfilePhoto() {
+    const saved = localStorage.getItem(profileStorageKey);
+    if (!saved) return;
+    const image = document.getElementById('profilePhoto');
+    image.src = saved;
+    image.style.display = 'block';
+    document.getElementById('profileInitials').style.display = 'none';
+}
+function renderProfileStats() {
+    let stats = {};
+    try { stats = JSON.parse(localStorage.getItem(profileStatsKey)) || {}; } catch (error) {}
+    document.getElementById('profileHeard').textContent = Number(stats.yes || 0) + Number(stats.no || 0);
+    document.getElementById('profileSales').textContent = Number(stats.sales || 0);
+    const list = document.getElementById('profileObjections');
+    const objections = Array.isArray(stats.objections) ? [...stats.objections].sort((a, b) => Number(b.count || 0) - Number(a.count || 0)).slice(0, 6) : [];
+    list.innerHTML = '';
+    if (!objections.length) { list.innerHTML = '<div class="profile-empty">Todavía no hay objeciones registradas.</div>'; return; }
+    objections.forEach(item => {
+        const row = document.createElement('div'); row.className = 'profile-objection';
+        const text = document.createElement('span'); text.textContent = item.text || 'Sin descripción';
+        const count = document.createElement('strong'); count.textContent = Number(item.count || 0) + ' casos';
+        row.append(text, count); list.appendChild(row);
+    });
+}
+document.getElementById('profilePhotoInput').addEventListener('change', event => {
+    const file = event.target.files[0];
+    const status = document.getElementById('profileStatus');
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { status.textContent = 'Elegí un archivo de imagen válido.'; status.style.color = 'var(--red-700)'; return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            localStorage.setItem(profileStorageKey, reader.result);
+            const image = document.getElementById('profilePhoto'); image.src = reader.result; image.style.display = 'block';
+            document.getElementById('profileInitials').style.display = 'none';
+            status.textContent = 'Foto guardada en este dispositivo.'; status.style.color = 'var(--green-700)';
+        } catch (error) { status.textContent = 'No se pudo guardar la foto.'; status.style.color = 'var(--red-700)'; }
+    };
+    reader.readAsDataURL(file);
+});
+loadProfilePhoto();
+renderProfileStats();
 </script>
 </body>
 </html>

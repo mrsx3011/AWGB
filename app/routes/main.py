@@ -12,7 +12,7 @@ from ..services.locales import (calles_de_hoy, contar_locales_hoy, fecha_larga, 
                                 obtener_local, proximo_numero_del_dia)
 from ..services.scheduler_service import agendar, recalcular_horarios_pendientes, reprogramar_jobs_pendientes, scheduler
 from ..services.telegram_service import enviar_reporte_telegram
-from ..templates import HTML_DASHBOARD, HTML_EDIT, HTML_FORM, HTML_LISTA, HTML_STATS
+from ..templates import HTML_DASHBOARD, HTML_EDIT, HTML_FORM, HTML_LISTA, HTML_PROFILE, HTML_STATS
 from .auth import usuario_actual
 
 
@@ -99,6 +99,22 @@ def register_main_routes(app):
     @app.route('/estadisticas')
     def estadisticas():
         return render_template_string(HTML_STATS, usuario=usuario_actual())
+
+
+    @app.route('/perfil')
+    def perfil():
+        usuario = usuario_actual()
+        cuenta = uno("SELECT username, email FROM usuarios WHERE username=%s", (usuario,)) or {
+            "username": usuario,
+            "email": "",
+        }
+        total_prospectos = uno("SELECT COUNT(*) AS total FROM locales WHERE usuario=%s", (usuario,))["total"]
+        return render_template_string(
+            HTML_PROFILE,
+            usuario=cuenta["username"],
+            email=cuenta["email"],
+            total_prospectos=total_prospectos,
+        )
 
 
     @app.route('/lista')
