@@ -1,9 +1,16 @@
 import os
 import sys
 from datetime import timedelta
+from pathlib import Path
 from urllib.parse import urlparse, unquote
 
 import pymysql.cursors
+from dotenv import load_dotenv
+
+
+# Carga la configuración local antes de construir Config y DB_CONFIG.
+# Las variables ya definidas por el entorno del servidor tienen prioridad.
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
 
 
 def env(nombre, default=None):

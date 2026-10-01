@@ -1,5 +1,7 @@
 import random
+import json
 from datetime import datetime, timedelta, time as dtime
+from pathlib import Path
 from urllib.parse import quote
 
 from flask import Response, flash, jsonify, redirect, render_template_string, request, url_for
@@ -12,8 +14,13 @@ from ..services.locales import (calles_de_hoy, contar_locales_hoy, fecha_larga, 
                                 obtener_local, proximo_numero_del_dia)
 from ..services.scheduler_service import agendar, recalcular_horarios_pendientes, reprogramar_jobs_pendientes, scheduler
 from ..services.telegram_service import enviar_reporte_telegram
-from ..templates import HTML_DASHBOARD, HTML_EDIT, HTML_FORM, HTML_LISTA, HTML_PROFILE, HTML_STATS
+from ..templates import HTML_DASHBOARD, HTML_EDIT, HTML_FORM, HTML_LISTA, HTML_PROFILE, HTML_STATS, HTML_STATS_REDESIGNED
 from .auth import usuario_actual
+
+
+OBJECIONES_VENTAS = json.loads(
+    (Path(__file__).resolve().parents[1] / "data" / "objeciones_ventas.json").read_text(encoding="utf-8-sig")
+)
 
 
 def register_main_routes(app):
@@ -98,7 +105,7 @@ def register_main_routes(app):
 
     @app.route('/estadisticas')
     def estadisticas():
-        return render_template_string(HTML_STATS, usuario=usuario_actual())
+        return render_template_string(HTML_STATS_REDESIGNED, usuario=usuario_actual(), catalogo=OBJECIONES_VENTAS)
 
 
     @app.route('/perfil')

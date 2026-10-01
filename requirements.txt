@@ -4,3 +4,4 @@ pytz
 requests
 PyMySQL
 gunicorn
+python-dotenv

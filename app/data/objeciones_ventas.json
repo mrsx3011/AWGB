@@ -1,0 +1,1652 @@
+[
+  {
+    "objecion": "No me interesa",
+    "cantidad": 0,
+    "problema": "Interés insuficiente",
+    "solucion": "Validar la respuesta y preguntar qué aspecto no le resulta relevante."
+  },
+  {
+    "objecion": "No estoy interesado",
+    "cantidad": 0,
+    "problema": "Interés insuficiente",
+    "solucion": "Descubrir si rechaza el producto, el momento o la propuesta."
+  },
+  {
+    "objecion": "No me interesa comprar",
+    "cantidad": 0,
+    "problema": "Compra innecesaria",
+    "solucion": "Preguntar qué necesitaría para considerar una compra."
+  },
+  {
+    "objecion": "No necesito nada",
+    "cantidad": 0,
+    "problema": "Necesidad inexistente",
+    "solucion": "Explorar necesidades actuales antes de presentar beneficios."
+  },
+  {
+    "objecion": "No necesito el producto",
+    "cantidad": 0,
+    "problema": "Necesidad inexistente",
+    "solucion": "Preguntar cómo resuelve actualmente esa necesidad."
+  },
+  {
+    "objecion": "Estoy conforme con lo que tengo",
+    "cantidad": 0,
+    "problema": "Solución satisfactoria",
+    "solucion": "Preguntar qué cambiaría si pudiera mejorar su situación actual."
+  },
+  {
+    "objecion": "No quiero cambiar",
+    "cantidad": 0,
+    "problema": "Resistencia al cambio",
+    "solucion": "Explorar qué riesgo percibe en realizar el cambio."
+  },
+  {
+    "objecion": "Siempre lo hice así",
+    "cantidad": 0,
+    "problema": "Hábito establecido",
+    "solucion": "Preguntar qué resultado obtiene actualmente con ese método."
+  },
+  {
+    "objecion": "No tengo interés en eso",
+    "cantidad": 0,
+    "problema": "Valor no percibido",
+    "solucion": "Relacionar la propuesta con una necesidad concreta."
+  },
+  {
+    "objecion": "No es algo que me interese ahora",
+    "cantidad": 0,
+    "problema": "Prioridad baja",
+    "solucion": "Preguntar qué tendría que cambiar para volverlo prioritario."
+  },
+  {
+    "objecion": "No quiero hablar con vendedores",
+    "cantidad": 0,
+    "problema": "Rechazo comercial",
+    "solucion": "Reducir la presión y explicar brevemente el motivo del contacto."
+  },
+  {
+    "objecion": "No tengo tiempo",
+    "cantidad": 0,
+    "problema": "Falta de tiempo",
+    "solucion": "Preguntar cuándo sería conveniente continuar la conversación."
+  },
+  {
+    "objecion": "Estoy ocupado",
+    "cantidad": 0,
+    "problema": "Momento inconveniente",
+    "solucion": "Solicitar un momento específico para retomar."
+  },
+  {
+    "objecion": "Estoy trabajando",
+    "cantidad": 0,
+    "problema": "Momento inconveniente",
+    "solucion": "Preguntar por un horario más conveniente."
+  },
+  {
+    "objecion": "Estoy en una reunión",
+    "cantidad": 0,
+    "problema": "Momento inconveniente",
+    "solucion": "Acordar un horario concreto para volver a llamar."
+  },
+  {
+    "objecion": "Llámame más tarde",
+    "cantidad": 0,
+    "problema": "Momento inconveniente",
+    "solucion": "Definir exactamente cuándo retomar la conversación."
+  },
+  {
+    "objecion": "Llámame otro día",
+    "cantidad": 0,
+    "problema": "Momento inconveniente",
+    "solucion": "Convertir el pedido en una fecha y horario concretos."
+  },
+  {
+    "objecion": "Llámame el mes que viene",
+    "cantidad": 0,
+    "problema": "Postergación indefinida",
+    "solucion": "Preguntar qué cambiaría el próximo mes."
+  },
+  {
+    "objecion": "Llámame en seis meses",
+    "cantidad": 0,
+    "problema": "Postergación indefinida",
+    "solucion": "Descubrir por qué necesita esperar seis meses."
+  },
+  {
+    "objecion": "Ahora no puedo hablar",
+    "cantidad": 0,
+    "problema": "Momento inconveniente",
+    "solucion": "Acordar un momento específico para continuar."
+  },
+  {
+    "objecion": "Estoy manejando",
+    "cantidad": 0,
+    "problema": "Situación insegura",
+    "solucion": "Priorizar seguridad y coordinar otra llamada."
+  },
+  {
+    "objecion": "Estoy entrando a trabajar",
+    "cantidad": 0,
+    "problema": "Momento inconveniente",
+    "solucion": "Preguntar cuándo tendrá disponibilidad."
+  },
+  {
+    "objecion": "Estoy saliendo",
+    "cantidad": 0,
+    "problema": "Momento inconveniente",
+    "solucion": "Acordar un horario posterior."
+  },
+  {
+    "objecion": "No puedo atender ahora",
+    "cantidad": 0,
+    "problema": "Momento inconveniente",
+    "solucion": "Solicitar un horario específico para retomar."
+  },
+  {
+    "objecion": "¿Quién sos?",
+    "cantidad": 0,
+    "problema": "Identidad desconocida",
+    "solucion": "Presentarse claramente y explicar el motivo del contacto."
+  },
+  {
+    "objecion": "¿De dónde llamás?",
+    "cantidad": 0,
+    "problema": "Origen desconocido",
+    "solucion": "Indicar empresa y motivo de la llamada."
+  },
+  {
+    "objecion": "¿De dónde sacaste mi número?",
+    "cantidad": 0,
+    "problema": "Privacidad percibida",
+    "solucion": "Explicar de forma transparente el origen del contacto."
+  },
+  {
+    "objecion": "¿Cómo conseguiste mis datos?",
+    "cantidad": 0,
+    "problema": "Privacidad percibida",
+    "solucion": "Responder transparentemente y respetar su negativa."
+  },
+  {
+    "objecion": "¿Esto es una llamada comercial?",
+    "cantidad": 0,
+    "problema": "Desconfianza inicial",
+    "solucion": "Confirmar el carácter comercial y explicar brevemente el motivo."
+  },
+  {
+    "objecion": "¿Me estás vendiendo algo?",
+    "cantidad": 0,
+    "problema": "Defensa comercial",
+    "solucion": "Ser transparente y explicar qué se ofrece."
+  },
+  {
+    "objecion": "¿Es una estafa?",
+    "cantidad": 0,
+    "problema": "Desconfianza elevada",
+    "solucion": "Dar información verificable sobre empresa y propuesta."
+  },
+  {
+    "objecion": "No confío en estas llamadas",
+    "cantidad": 0,
+    "problema": "Desconfianza elevada",
+    "solucion": "Validar la preocupación y ofrecer información verificable."
+  },
+  {
+    "objecion": "No doy datos por teléfono",
+    "cantidad": 0,
+    "problema": "Riesgo percibido",
+    "solucion": "Explicar qué datos son necesarios y por qué."
+  },
+  {
+    "objecion": "No quiero dar información personal",
+    "cantidad": 0,
+    "problema": "Privacidad percibida",
+    "solucion": "Solicitar únicamente los datos indispensables."
+  },
+  {
+    "objecion": "Prefiero hacerlo personalmente",
+    "cantidad": 0,
+    "problema": "Preferencia presencial",
+    "solucion": "Explicar qué puede resolverse remotamente y ofrecer alternativa."
+  },
+  {
+    "objecion": "Prefiero hablar con alguien conocido",
+    "cantidad": 0,
+    "problema": "Confianza insuficiente",
+    "solucion": "Explicar credenciales y facilitar verificación."
+  },
+  {
+    "objecion": "Mandame información",
+    "cantidad": 0,
+    "problema": "Interés indeterminado",
+    "solucion": "Preguntar qué información necesita específicamente."
+  },
+  {
+    "objecion": "Mandame todo por WhatsApp",
+    "cantidad": 0,
+    "problema": "Evasión conversacional",
+    "solucion": "Detectar qué quiere evaluar antes de enviar información."
+  },
+  {
+    "objecion": "Mandame un correo",
+    "cantidad": 0,
+    "problema": "Evasión conversacional",
+    "solucion": "Preguntar qué aspecto quiere revisar primero."
+  },
+  {
+    "objecion": "Pasame la página",
+    "cantidad": 0,
+    "problema": "Interés indeterminado",
+    "solucion": "Enviar información y acordar cuándo revisarla."
+  },
+  {
+    "objecion": "Lo voy a mirar después",
+    "cantidad": 0,
+    "problema": "Seguimiento incierto",
+    "solucion": "Acordar cuándo volver a conversar sobre la información."
+  },
+  {
+    "objecion": "Después te aviso",
+    "cantidad": 0,
+    "problema": "Seguimiento incierto",
+    "solucion": "Preguntar qué necesita evaluar antes de decidir."
+  },
+  {
+    "objecion": "Déjame la información y yo te contacto",
+    "cantidad": 0,
+    "problema": "Seguimiento incierto",
+    "solucion": "Acordar un seguimiento concreto."
+  },
+  {
+    "objecion": "No necesito que me expliques",
+    "cantidad": 0,
+    "problema": "Interés insuficiente",
+    "solucion": "Preguntar qué información ya conoce."
+  },
+  {
+    "objecion": "Es muy caro",
+    "cantidad": 0,
+    "problema": "Valor insuficiente",
+    "solucion": "Preguntar qué precio considera razonable y comparar valor."
+  },
+  {
+    "objecion": "Está caro",
+    "cantidad": 0,
+    "problema": "Valor insuficiente",
+    "solucion": "Descubrir qué parte considera costosa."
+  },
+  {
+    "objecion": "Es demasiado dinero",
+    "cantidad": 0,
+    "problema": "Presupuesto insuficiente",
+    "solucion": "Explorar presupuesto y relación costo-beneficio."
+  },
+  {
+    "objecion": "No puedo pagarlo",
+    "cantidad": 0,
+    "problema": "Capacidad económica",
+    "solucion": "Confirmar si el problema es monto, forma o momento de pago."
+  },
+  {
+    "objecion": "No tengo plata",
+    "cantidad": 0,
+    "problema": "Falta de presupuesto",
+    "solucion": "Preguntar si existe otra condición que permita avanzar."
+  },
+  {
+    "objecion": "No tengo presupuesto",
+    "cantidad": 0,
+    "problema": "Presupuesto inexistente",
+    "solucion": "Preguntar cuándo podría disponer de presupuesto."
+  },
+  {
+    "objecion": "No puedo gastar tanto",
+    "cantidad": 0,
+    "problema": "Presupuesto limitado",
+    "solucion": "Explorar alternativas dentro de su capacidad."
+  },
+  {
+    "objecion": "Quiero algo más barato",
+    "cantidad": 0,
+    "problema": "Precio elevado",
+    "solucion": "Preguntar qué características está dispuesto a sacrificar."
+  },
+  {
+    "objecion": "Tengo un presupuesto menor",
+    "cantidad": 0,
+    "problema": "Presupuesto limitado",
+    "solucion": "Comparar opciones compatibles con su presupuesto."
+  },
+  {
+    "objecion": "No vale lo que cuesta",
+    "cantidad": 0,
+    "problema": "Valor insuficiente",
+    "solucion": "Preguntar qué valor esperaba obtener."
+  },
+  {
+    "objecion": "No me justifica el precio",
+    "cantidad": 0,
+    "problema": "Valor insuficiente",
+    "solucion": "Profundizar en beneficios y resultado esperado."
+  },
+  {
+    "objecion": "¿Por qué cuesta tanto?",
+    "cantidad": 0,
+    "problema": "Precio cuestionado",
+    "solucion": "Explicar los factores que determinan el precio."
+  },
+  {
+    "objecion": "Encontré algo más barato",
+    "cantidad": 0,
+    "problema": "Comparación económica",
+    "solucion": "Comparar condiciones y no únicamente precio."
+  },
+  {
+    "objecion": "Me ofrecieron algo más barato",
+    "cantidad": 0,
+    "problema": "Oferta competidora",
+    "solucion": "Preguntar qué incluye exactamente la alternativa."
+  },
+  {
+    "objecion": "Quiero pensarlo por el precio",
+    "cantidad": 0,
+    "problema": "Valor insuficiente",
+    "solucion": "Preguntar qué debería justificar el precio."
+  },
+  {
+    "objecion": "Necesito juntar la plata",
+    "cantidad": 0,
+    "problema": "Liquidez insuficiente",
+    "solucion": "Determinar cuándo dispondrá del dinero."
+  },
+  {
+    "objecion": "No quiero endeudarme",
+    "cantidad": 0,
+    "problema": "Riesgo financiero",
+    "solucion": "Explicar obligaciones, costos y condiciones con transparencia."
+  },
+  {
+    "objecion": "No quiero pagar cuotas",
+    "cantidad": 0,
+    "problema": "Rechazo financiero",
+    "solucion": "Preguntar qué modalidad de pago prefiere."
+  },
+  {
+    "objecion": "La cuota es muy alta",
+    "cantidad": 0,
+    "problema": "Cuota elevada",
+    "solucion": "Determinar qué cuota puede afrontar cómodamente."
+  },
+  {
+    "objecion": "No puedo pagar esa cuota",
+    "cantidad": 0,
+    "problema": "Capacidad mensual",
+    "solucion": "Explorar presupuesto mensual disponible."
+  },
+  {
+    "objecion": "No veo el beneficio",
+    "cantidad": 0,
+    "problema": "Beneficio difuso",
+    "solucion": "Relacionar la propuesta con una necesidad concreta."
+  },
+  {
+    "objecion": "No veo qué gano",
+    "cantidad": 0,
+    "problema": "Valor difuso",
+    "solucion": "Preguntar qué resultado considera importante."
+  },
+  {
+    "objecion": "¿Qué gano comprándolo?",
+    "cantidad": 0,
+    "problema": "Beneficio desconocido",
+    "solucion": "Traducir características en beneficios concretos."
+  },
+  {
+    "objecion": "No sé para qué lo necesito",
+    "cantidad": 0,
+    "problema": "Necesidad inexistente",
+    "solucion": "Explorar problemas actuales relacionados."
+  },
+  {
+    "objecion": "No es prioritario",
+    "cantidad": 0,
+    "problema": "Prioridad baja",
+    "solucion": "Explorar consecuencias de mantener la situación actual."
+  },
+  {
+    "objecion": "Puedo seguir como estoy",
+    "cantidad": 0,
+    "problema": "Inercia actual",
+    "solucion": "Preguntar qué resultado obtiene manteniendo la situación."
+  },
+  {
+    "objecion": "Hasta ahora me funcionó",
+    "cantidad": 0,
+    "problema": "Satisfacción actual",
+    "solucion": "Preguntar qué mejoraría aunque actualmente funcione."
+  },
+  {
+    "objecion": "No tengo ningún problema",
+    "cantidad": 0,
+    "problema": "Problema inexistente",
+    "solucion": "Explorar necesidades sin asumir problemas."
+  },
+  {
+    "objecion": "No necesito cambiar nada",
+    "cantidad": 0,
+    "problema": "Cambio innecesario",
+    "solucion": "Preguntar qué tendría que suceder para considerar cambiar."
+  },
+  {
+    "objecion": "No me hace falta",
+    "cantidad": 0,
+    "problema": "Necesidad insuficiente",
+    "solucion": "Investigar situación actual y necesidades futuras."
+  },
+  {
+    "objecion": "Ya tengo proveedor",
+    "cantidad": 0,
+    "problema": "Proveedor actual",
+    "solucion": "Preguntar qué aspectos valora de su proveedor actual."
+  },
+  {
+    "objecion": "Ya trabajo con otra empresa",
+    "cantidad": 0,
+    "problema": "Proveedor establecido",
+    "solucion": "Explorar satisfacción y posibles áreas de mejora."
+  },
+  {
+    "objecion": "Ya tengo una solución",
+    "cantidad": 0,
+    "problema": "Solución existente",
+    "solucion": "Preguntar qué resultados obtiene actualmente."
+  },
+  {
+    "objecion": "Estoy con la competencia",
+    "cantidad": 0,
+    "problema": "Competidor establecido",
+    "solucion": "Comparar necesidades y condiciones sin atacar al competidor."
+  },
+  {
+    "objecion": "Mi proveedor me da lo mismo",
+    "cantidad": 0,
+    "problema": "Valor diferencial",
+    "solucion": "Preguntar qué considera importante además del producto."
+  },
+  {
+    "objecion": "No quiero cambiar de proveedor",
+    "cantidad": 0,
+    "problema": "Costo del cambio",
+    "solucion": "Explorar qué riesgo percibe en cambiar."
+  },
+  {
+    "objecion": "Estoy atado a un contrato",
+    "cantidad": 0,
+    "problema": "Contrato vigente",
+    "solucion": "Preguntar cuándo termina y qué condiciones tendrá entonces."
+  },
+  {
+    "objecion": "Tengo contrato hasta el año que viene",
+    "cantidad": 0,
+    "problema": "Contrato vigente",
+    "solucion": "Registrar vencimiento y acordar seguimiento."
+  },
+  {
+    "objecion": "Lo hacemos internamente",
+    "cantidad": 0,
+    "problema": "Solución interna",
+    "solucion": "Explorar costos y resultados de la solución interna."
+  },
+  {
+    "objecion": "Lo hago yo mismo",
+    "cantidad": 0,
+    "problema": "Autogestión actual",
+    "solucion": "Comparar tiempo, costo y resultado de ambas alternativas."
+  },
+  {
+    "objecion": "Mi amigo me lo consigue",
+    "cantidad": 0,
+    "problema": "Alternativa informal",
+    "solucion": "Preguntar qué condiciones obtiene actualmente."
+  },
+  {
+    "objecion": "Mi conocido trabaja con eso",
+    "cantidad": 0,
+    "problema": "Alternativa conocida",
+    "solucion": "Explorar qué valora de esa opción."
+  },
+  {
+    "objecion": "No sé si funciona",
+    "cantidad": 0,
+    "problema": "Eficacia dudosa",
+    "solucion": "Presentar evidencia verificable y casos relevantes."
+  },
+  {
+    "objecion": "No sé si me va a servir",
+    "cantidad": 0,
+    "problema": "Encaje incierto",
+    "solucion": "Preguntar qué resultado necesita obtener."
+  },
+  {
+    "objecion": "¿Y si no funciona?",
+    "cantidad": 0,
+    "problema": "Riesgo percibido",
+    "solucion": "Explicar condiciones, garantías y límites reales."
+  },
+  {
+    "objecion": "No quiero arriesgarme",
+    "cantidad": 0,
+    "problema": "Riesgo percibido",
+    "solucion": "Identificar exactamente qué riesgo preocupa."
+  },
+  {
+    "objecion": "Ya tuve una mala experiencia",
+    "cantidad": 0,
+    "problema": "Experiencia negativa",
+    "solucion": "Preguntar qué ocurrió y abordar específicamente esa preocupación."
+  },
+  {
+    "objecion": "Ya me estafaron antes",
+    "cantidad": 0,
+    "problema": "Trauma comercial",
+    "solucion": "Validar la preocupación y ofrecer mecanismos verificables."
+  },
+  {
+    "objecion": "No quiero volver a equivocarme",
+    "cantidad": 0,
+    "problema": "Miedo a equivocarse",
+    "solucion": "Aclarar condiciones, riesgos y proceso antes de decidir."
+  },
+  {
+    "objecion": "No conozco la empresa",
+    "cantidad": 0,
+    "problema": "Empresa desconocida",
+    "solucion": "Presentar trayectoria y canales oficiales verificables."
+  },
+  {
+    "objecion": "Nunca escuché de ustedes",
+    "cantidad": 0,
+    "problema": "Empresa desconocida",
+    "solucion": "Explicar quiénes son y cómo puede verificar la empresa."
+  },
+  {
+    "objecion": "Quiero investigar primero",
+    "cantidad": 0,
+    "problema": "Confianza insuficiente",
+    "solucion": "Preguntar qué información necesita investigar."
+  },
+  {
+    "objecion": "Quiero leer reseñas",
+    "cantidad": 0,
+    "problema": "Confianza insuficiente",
+    "solucion": "Facilitar fuentes verificables y acordar seguimiento."
+  },
+  {
+    "objecion": "Necesito referencias",
+    "cantidad": 0,
+    "problema": "Prueba insuficiente",
+    "solucion": "Presentar referencias o casos verificables."
+  },
+  {
+    "objecion": "No tiene lo que necesito",
+    "cantidad": 0,
+    "problema": "Falta de funcionalidad",
+    "solucion": "Identificar la función indispensable y confirmar alternativas."
+  },
+  {
+    "objecion": "Le falta una función",
+    "cantidad": 0,
+    "problema": "Funcionalidad faltante",
+    "solucion": "Determinar si la función es realmente indispensable."
+  },
+  {
+    "objecion": "No tiene todas las características",
+    "cantidad": 0,
+    "problema": "Cobertura insuficiente",
+    "solucion": "Priorizar las características realmente necesarias."
+  },
+  {
+    "objecion": "Es demasiado complicado",
+    "cantidad": 0,
+    "problema": "Complejidad percibida",
+    "solucion": "Simplificar la explicación y mostrar el proceso."
+  },
+  {
+    "objecion": "No sé usarlo",
+    "cantidad": 0,
+    "problema": "Curva de aprendizaje",
+    "solucion": "Explicar capacitación, soporte y facilidad de uso."
+  },
+  {
+    "objecion": "No tengo tiempo para aprender",
+    "cantidad": 0,
+    "problema": "Aprendizaje costoso",
+    "solucion": "Explicar tiempo real de implementación y capacitación."
+  },
+  {
+    "objecion": "Es difícil de implementar",
+    "cantidad": 0,
+    "problema": "Implementación compleja",
+    "solucion": "Explicar etapas y soporte disponible."
+  },
+  {
+    "objecion": "No sé si es compatible",
+    "cantidad": 0,
+    "problema": "Compatibilidad incierta",
+    "solucion": "Verificar requisitos y compatibilidad concreta."
+  },
+  {
+    "objecion": "No funciona con mi sistema",
+    "cantidad": 0,
+    "problema": "Integración insuficiente",
+    "solucion": "Confirmar integración disponible o alternativa."
+  },
+  {
+    "objecion": "Necesito una personalización",
+    "cantidad": 0,
+    "problema": "Adaptación insuficiente",
+    "solucion": "Determinar si la personalización es indispensable."
+  },
+  {
+    "objecion": "Quiero otra versión",
+    "cantidad": 0,
+    "problema": "Producto inadecuado",
+    "solucion": "Identificar características prioritarias para ofrecer alternativa."
+  },
+  {
+    "objecion": "No me gusta el producto",
+    "cantidad": 0,
+    "problema": "Rechazo subjetivo",
+    "solucion": "Preguntar qué aspecto específicamente no le gusta."
+  },
+  {
+    "objecion": "No es el momento",
+    "cantidad": 0,
+    "problema": "Timing inadecuado",
+    "solucion": "Preguntar qué tendría que suceder para que sea el momento."
+  },
+  {
+    "objecion": "Ahora no",
+    "cantidad": 0,
+    "problema": "Timing inadecuado",
+    "solucion": "Descubrir cuándo podría tener sentido avanzar."
+  },
+  {
+    "objecion": "Más adelante",
+    "cantidad": 0,
+    "problema": "Postergación indefinida",
+    "solucion": "Definir qué condición determina ese momento."
+  },
+  {
+    "objecion": "Lo voy a hacer más adelante",
+    "cantidad": 0,
+    "problema": "Postergación indefinida",
+    "solucion": "Preguntar qué necesita resolver antes."
+  },
+  {
+    "objecion": "Primero tengo otras cosas",
+    "cantidad": 0,
+    "problema": "Prioridad secundaria",
+    "solucion": "Identificar qué prioridad está desplazando la compra."
+  },
+  {
+    "objecion": "Tengo otros gastos",
+    "cantidad": 0,
+    "problema": "Prioridad financiera",
+    "solucion": "Preguntar cuándo podría reconsiderarlo."
+  },
+  {
+    "objecion": "Estoy esperando cobrar",
+    "cantidad": 0,
+    "problema": "Liquidez temporal",
+    "solucion": "Acordar seguimiento después del cobro."
+  },
+  {
+    "objecion": "Estoy esperando una respuesta",
+    "cantidad": 0,
+    "problema": "Decisión pendiente",
+    "solucion": "Identificar quién debe responder y cuándo."
+  },
+  {
+    "objecion": "Estoy esperando otra oferta",
+    "cantidad": 0,
+    "problema": "Comparación pendiente",
+    "solucion": "Preguntar qué criterios utilizará para comparar."
+  },
+  {
+    "objecion": "Tengo que consultarlo",
+    "cantidad": 0,
+    "problema": "Decisión compartida",
+    "solucion": "Preguntar con quién debe consultarlo y qué evaluará."
+  },
+  {
+    "objecion": "Tengo que hablar con mi pareja",
+    "cantidad": 0,
+    "problema": "Decisión compartida",
+    "solucion": "Identificar qué información necesita compartir con su pareja."
+  },
+  {
+    "objecion": "Tengo que hablar con mi marido",
+    "cantidad": 0,
+    "problema": "Decisión compartida",
+    "solucion": "Preguntar qué aspecto decidirán juntos."
+  },
+  {
+    "objecion": "Tengo que hablar con mi esposa",
+    "cantidad": 0,
+    "problema": "Decisión compartida",
+    "solucion": "Preguntar qué aspecto necesita consultar."
+  },
+  {
+    "objecion": "Tengo que hablar con mi jefe",
+    "cantidad": 0,
+    "problema": "Autoridad externa",
+    "solucion": "Preguntar qué criterios utilizará el responsable."
+  },
+  {
+    "objecion": "Mi jefe decide",
+    "cantidad": 0,
+    "problema": "Autoridad externa",
+    "solucion": "Identificar al decisor y facilitar la conversación."
+  },
+  {
+    "objecion": "Yo no tomo la decisión",
+    "cantidad": 0,
+    "problema": "Autoridad insuficiente",
+    "solucion": "Preguntar quién participa en la decisión."
+  },
+  {
+    "objecion": "Tengo que pedir permiso",
+    "cantidad": 0,
+    "problema": "Autonomía limitada",
+    "solucion": "Identificar quién autoriza y qué necesita conocer."
+  },
+  {
+    "objecion": "No puedo decidir solo",
+    "cantidad": 0,
+    "problema": "Decisión compartida",
+    "solucion": "Identificar participantes y criterios de decisión."
+  },
+  {
+    "objecion": "Lo tenemos que decidir entre varios",
+    "cantidad": 0,
+    "problema": "Decisión grupal",
+    "solucion": "Mapear participantes y necesidades de cada uno."
+  },
+  {
+    "objecion": "Primero tengo que preguntarle a alguien",
+    "cantidad": 0,
+    "problema": "Autoridad externa",
+    "solucion": "Preguntar qué información necesita esa persona."
+  },
+  {
+    "objecion": "Mi contador tiene que verlo",
+    "cantidad": 0,
+    "problema": "Validación externa",
+    "solucion": "Preparar información para facilitar su evaluación."
+  },
+  {
+    "objecion": "Mi abogado tiene que revisarlo",
+    "cantidad": 0,
+    "problema": "Validación legal",
+    "solucion": "Facilitar condiciones y documentación pertinente."
+  },
+  {
+    "objecion": "Lo tengo que pensar",
+    "cantidad": 0,
+    "problema": "Duda no identificada",
+    "solucion": "Preguntar qué aspecto específico necesita pensar."
+  },
+  {
+    "objecion": "Necesito pensarlo",
+    "cantidad": 0,
+    "problema": "Duda no identificada",
+    "solucion": "Preguntar qué le genera mayor incertidumbre."
+  },
+  {
+    "objecion": "Quiero pensarlo tranquilo",
+    "cantidad": 0,
+    "problema": "Necesidad de reflexión",
+    "solucion": "Preguntar qué información necesita antes de decidir."
+  },
+  {
+    "objecion": "Quiero analizarlo",
+    "cantidad": 0,
+    "problema": "Evaluación pendiente",
+    "solucion": "Preguntar qué criterios utilizará para evaluarlo."
+  },
+  {
+    "objecion": "Necesito compararlo",
+    "cantidad": 0,
+    "problema": "Comparación pendiente",
+    "solucion": "Preguntar con qué alternativas lo comparará."
+  },
+  {
+    "objecion": "Quiero consultar otras opciones",
+    "cantidad": 0,
+    "problema": "Comparación pendiente",
+    "solucion": "Preguntar qué factores serán determinantes."
+  },
+  {
+    "objecion": "Quiero hablarlo con alguien",
+    "cantidad": 0,
+    "problema": "Decisión compartida",
+    "solucion": "Preguntar qué punto necesita validar."
+  },
+  {
+    "objecion": "Después veo",
+    "cantidad": 0,
+    "problema": "Decisión indefinida",
+    "solucion": "Preguntar qué le impide decidir ahora."
+  },
+  {
+    "objecion": "Todavía no estoy seguro",
+    "cantidad": 0,
+    "problema": "Confianza insuficiente",
+    "solucion": "Preguntar qué duda necesita resolver."
+  },
+  {
+    "objecion": "No estoy convencido",
+    "cantidad": 0,
+    "problema": "Duda específica",
+    "solucion": "Preguntar qué debería aclararse para decidir."
+  },
+  {
+    "objecion": "No quiero comprometerme",
+    "cantidad": 0,
+    "problema": "Compromiso percibido",
+    "solucion": "Explicar exactamente el nivel de compromiso requerido."
+  },
+  {
+    "objecion": "No quiero firmar nada",
+    "cantidad": 0,
+    "problema": "Compromiso percibido",
+    "solucion": "Explicar qué documento se firma y sus condiciones."
+  },
+  {
+    "objecion": "No quiero quedar atado",
+    "cantidad": 0,
+    "problema": "Falta de flexibilidad",
+    "solucion": "Explicar duración, cancelación y condiciones."
+  },
+  {
+    "objecion": "¿Puedo cancelar?",
+    "cantidad": 0,
+    "problema": "Riesgo contractual",
+    "solucion": "Explicar claramente las condiciones de cancelación."
+  },
+  {
+    "objecion": "¿Tiene permanencia?",
+    "cantidad": 0,
+    "problema": "Compromiso contractual",
+    "solucion": "Informar duración y condiciones reales."
+  },
+  {
+    "objecion": "No quiero permanencia",
+    "cantidad": 0,
+    "problema": "Falta de flexibilidad",
+    "solucion": "Explicar alternativas contractuales disponibles."
+  },
+  {
+    "objecion": "¿Qué pasa si cambio de opinión?",
+    "cantidad": 0,
+    "problema": "Riesgo de decisión",
+    "solucion": "Explicar condiciones de modificación o cancelación."
+  },
+  {
+    "objecion": "Quiero garantías",
+    "cantidad": 0,
+    "problema": "Riesgo percibido",
+    "solucion": "Explicar garantías reales y condiciones."
+  },
+  {
+    "objecion": "¿Qué pasa si no cumplen?",
+    "cantidad": 0,
+    "problema": "Riesgo contractual",
+    "solucion": "Explicar responsabilidades y mecanismos disponibles."
+  },
+  {
+    "objecion": "Quiero verlo primero",
+    "cantidad": 0,
+    "problema": "Necesidad de evidencia",
+    "solucion": "Ofrecer demostración o información verificable."
+  },
+  {
+    "objecion": "Quiero probarlo",
+    "cantidad": 0,
+    "problema": "Riesgo percibido",
+    "solucion": "Explicar prueba, demostración o condiciones disponibles."
+  },
+  {
+    "objecion": "Necesito más información",
+    "cantidad": 0,
+    "problema": "Información insuficiente",
+    "solucion": "Preguntar qué información específica falta."
+  },
+  {
+    "objecion": "No entiendo cómo funciona",
+    "cantidad": 0,
+    "problema": "Comprensión insuficiente",
+    "solucion": "Explicar el proceso paso a paso."
+  },
+  {
+    "objecion": "No entiendo las condiciones",
+    "cantidad": 0,
+    "problema": "Condiciones confusas",
+    "solucion": "Simplificar y aclarar cada condición."
+  },
+  {
+    "objecion": "Hay demasiadas condiciones",
+    "cantidad": 0,
+    "problema": "Complejidad percibida",
+    "solucion": "Resumir únicamente las condiciones relevantes."
+  },
+  {
+    "objecion": "El proceso es complicado",
+    "cantidad": 0,
+    "problema": "Proceso complejo",
+    "solucion": "Explicar etapas y responsables."
+  },
+  {
+    "objecion": "No quiero hacer tantos trámites",
+    "cantidad": 0,
+    "problema": "Fricción administrativa",
+    "solucion": "Explicar qué trámites son realmente necesarios."
+  },
+  {
+    "objecion": "No tengo los documentos",
+    "cantidad": 0,
+    "problema": "Documentación faltante",
+    "solucion": "Indicar exactamente qué documentación necesita."
+  },
+  {
+    "objecion": "No tengo tiempo para los trámites",
+    "cantidad": 0,
+    "problema": "Fricción administrativa",
+    "solucion": "Explicar tiempos y asistencia disponible."
+  },
+  {
+    "objecion": "No estoy en la ciudad",
+    "cantidad": 0,
+    "problema": "Ubicación inconveniente",
+    "solucion": "Verificar si el proceso puede realizarse remotamente."
+  },
+  {
+    "objecion": "Me queda lejos",
+    "cantidad": 0,
+    "problema": "Distancia inconveniente",
+    "solucion": "Ofrecer alternativas remotas o cercanas."
+  },
+  {
+    "objecion": "No puedo ir",
+    "cantidad": 0,
+    "problema": "Traslado inconveniente",
+    "solucion": "Explorar alternativas al traslado."
+  },
+  {
+    "objecion": "No tengo cómo ir",
+    "cantidad": 0,
+    "problema": "Traslado inconveniente",
+    "solucion": "Buscar una modalidad que no requiera traslado."
+  },
+  {
+    "objecion": "No puedo hacerlo hoy",
+    "cantidad": 0,
+    "problema": "Disponibilidad limitada",
+    "solucion": "Acordar otra fecha concreta."
+  },
+  {
+    "objecion": "No puedo hacerlo esta semana",
+    "cantidad": 0,
+    "problema": "Disponibilidad limitada",
+    "solucion": "Coordinar una fecha posterior."
+  },
+  {
+    "objecion": "No quiero decidir ahora",
+    "cantidad": 0,
+    "problema": "Duda pendiente",
+    "solucion": "Preguntar qué información falta para decidir."
+  },
+  {
+    "objecion": "No estoy listo",
+    "cantidad": 0,
+    "problema": "Preparación insuficiente",
+    "solucion": "Identificar qué condición falta para avanzar."
+  },
+  {
+    "objecion": "Todavía no",
+    "cantidad": 0,
+    "problema": "Timing incierto",
+    "solucion": "Preguntar cuándo tendría sentido avanzar."
+  },
+  {
+    "objecion": "Quiero esperar",
+    "cantidad": 0,
+    "problema": "Postergación",
+    "solucion": "Preguntar qué espera concretamente."
+  },
+  {
+    "objecion": "No quiero cerrar todavía",
+    "cantidad": 0,
+    "problema": "Compromiso insuficiente",
+    "solucion": "Preguntar qué necesita resolver antes del cierre."
+  },
+  {
+    "objecion": "Quiero seguir evaluando",
+    "cantidad": 0,
+    "problema": "Evaluación pendiente",
+    "solucion": "Preguntar qué aspectos siguen abiertos."
+  },
+  {
+    "objecion": "Tengo algunas dudas",
+    "cantidad": 0,
+    "problema": "Dudas pendientes",
+    "solucion": "Identificar cada duda antes de continuar."
+  },
+  {
+    "objecion": "Me quedaron preguntas",
+    "cantidad": 0,
+    "problema": "Información incompleta",
+    "solucion": "Preguntar cuáles son las preguntas pendientes."
+  },
+  {
+    "objecion": "No sé si es para mí",
+    "cantidad": 0,
+    "problema": "Encaje incierto",
+    "solucion": "Revisar necesidades y condiciones del prospecto."
+  },
+  {
+    "objecion": "No sé si quiero hacerlo",
+    "cantidad": 0,
+    "problema": "Deseo insuficiente",
+    "solucion": "Explorar qué le genera resistencia."
+  },
+  {
+    "objecion": "Prefiero esperar",
+    "cantidad": 0,
+    "problema": "Timing incierto",
+    "solucion": "Preguntar qué evento espera antes de decidir."
+  },
+  {
+    "objecion": "Voy a dejarlo para después",
+    "cantidad": 0,
+    "problema": "Postergación",
+    "solucion": "Preguntar qué debería cambiar para avanzar."
+  },
+  {
+    "objecion": "¿Cuánto dura?",
+    "cantidad": 0,
+    "problema": "Prioridad secundaria",
+    "solucion": "Responder brevemente y retomar la necesidad principal."
+  },
+  {
+    "objecion": "¿Dónde están ubicados?",
+    "cantidad": 0,
+    "problema": "Información secundaria",
+    "solucion": "Responder y regresar al motivo de compra."
+  },
+  {
+    "objecion": "¿Quién te contrató?",
+    "cantidad": 0,
+    "problema": "Desconfianza inicial",
+    "solucion": "Responder brevemente y explicar el propósito."
+  },
+  {
+    "objecion": "¿Cuántos clientes tienen?",
+    "cantidad": 0,
+    "problema": "Prueba social",
+    "solucion": "Responder con datos verificables y continuar diagnóstico."
+  },
+  {
+    "objecion": "¿Hace cuánto existen?",
+    "cantidad": 0,
+    "problema": "Trayectoria cuestionada",
+    "solucion": "Dar información verificable sobre trayectoria."
+  },
+  {
+    "objecion": "¿Quiénes son sus clientes?",
+    "cantidad": 0,
+    "problema": "Prueba social",
+    "solucion": "Compartir referencias permitidas y verificables."
+  },
+  {
+    "objecion": "¿Por qué debería elegirlos?",
+    "cantidad": 0,
+    "problema": "Diferenciación insuficiente",
+    "solucion": "Preguntar qué criterio considera más importante."
+  },
+  {
+    "objecion": "¿Qué los diferencia?",
+    "cantidad": 0,
+    "problema": "Diferenciación insuficiente",
+    "solucion": "Explicar diferencias relacionadas con sus necesidades."
+  },
+  {
+    "objecion": "Quiero comparar precios",
+    "cantidad": 0,
+    "problema": "Comparación económica",
+    "solucion": "Preguntar qué condiciones comparará además del precio."
+  },
+  {
+    "objecion": "Estoy comparando varias opciones",
+    "cantidad": 0,
+    "problema": "Evaluación competitiva",
+    "solucion": "Identificar sus criterios de decisión."
+  },
+  {
+    "objecion": "Tengo otra propuesta",
+    "cantidad": 0,
+    "problema": "Oferta competidora",
+    "solucion": "Comparar condiciones equivalentes."
+  },
+  {
+    "objecion": "Otra empresa me ofrece más",
+    "cantidad": 0,
+    "problema": "Oferta superior percibida",
+    "solucion": "Preguntar qué incluye exactamente la oferta."
+  },
+  {
+    "objecion": "La competencia me da mejores condiciones",
+    "cantidad": 0,
+    "problema": "Condiciones competitivas",
+    "solucion": "Comparar condiciones completas y verificables."
+  },
+  {
+    "objecion": "Voy a pedir otros presupuestos",
+    "cantidad": 0,
+    "problema": "Comparación pendiente",
+    "solucion": "Preguntar qué criterios utilizará para elegir."
+  },
+  {
+    "objecion": "Quiero hablar con otra empresa",
+    "cantidad": 0,
+    "problema": "Comparación pendiente",
+    "solucion": "Identificar qué información quiere comparar."
+  },
+  {
+    "objecion": "Tengo miedo de perder dinero",
+    "cantidad": 0,
+    "problema": "Riesgo financiero",
+    "solucion": "Explicar costos, condiciones y riesgos reales."
+  },
+  {
+    "objecion": "No quiero cometer un error",
+    "cantidad": 0,
+    "problema": "Miedo a equivocarse",
+    "solucion": "Identificar qué aspecto genera incertidumbre."
+  },
+  {
+    "objecion": "Me preocupa que salga mal",
+    "cantidad": 0,
+    "problema": "Riesgo percibido",
+    "solucion": "Explorar escenarios y explicar mitigaciones reales."
+  },
+  {
+    "objecion": "¿Y si después no me sirve?",
+    "cantidad": 0,
+    "problema": "Riesgo de encaje",
+    "solucion": "Aclarar condiciones y límites antes de decidir."
+  },
+  {
+    "objecion": "¿Y si cambio de opinión?",
+    "cantidad": 0,
+    "problema": "Riesgo de compromiso",
+    "solucion": "Explicar políticas reales de modificación o cancelación."
+  },
+  {
+    "objecion": "No quiero perder tiempo",
+    "cantidad": 0,
+    "problema": "Riesgo temporal",
+    "solucion": "Explicar duración y pasos necesarios."
+  },
+  {
+    "objecion": "Ya tuve problemas con una empresa así",
+    "cantidad": 0,
+    "problema": "Experiencia negativa",
+    "solucion": "Preguntar qué problema tuvo y abordarlo directamente."
+  },
+  {
+    "objecion": "Me prometieron lo mismo antes",
+    "cantidad": 0,
+    "problema": "Promesa desacreditada",
+    "solucion": "Evitar promesas y presentar condiciones verificables."
+  },
+  {
+    "objecion": "Todos los vendedores dicen lo mismo",
+    "cantidad": 0,
+    "problema": "Desconfianza comercial",
+    "solucion": "Preguntar qué evidencia consideraría convincente."
+  },
+  {
+    "objecion": "No quiero que me vendan humo",
+    "cantidad": 0,
+    "problema": "Desconfianza comercial",
+    "solucion": "Ser concreto y diferenciar hechos de promesas."
+  },
+  {
+    "objecion": "Ya me hicieron perder tiempo",
+    "cantidad": 0,
+    "problema": "Experiencia negativa",
+    "solucion": "Reconocer la preocupación y ser directo."
+  },
+  {
+    "objecion": "Ya hablé con varios vendedores",
+    "cantidad": 0,
+    "problema": "Fatiga comercial",
+    "solucion": "Preguntar qué información aún no pudo resolver."
+  },
+  {
+    "objecion": "No me da confianza",
+    "cantidad": 0,
+    "problema": "Confianza insuficiente",
+    "solucion": "Preguntar qué necesita verificar para confiar."
+  },
+  {
+    "objecion": "No me convence",
+    "cantidad": 0,
+    "problema": "Valor insuficiente",
+    "solucion": "Preguntar qué aspecto no termina de convencerlo."
+  },
+  {
+    "objecion": "No me gusta",
+    "cantidad": 0,
+    "problema": "Rechazo subjetivo",
+    "solucion": "Preguntar específicamente qué no le gusta."
+  },
+  {
+    "objecion": "No me cierra",
+    "cantidad": 0,
+    "problema": "Duda indefinida",
+    "solucion": "Preguntar qué punto no termina de cerrar."
+  },
+  {
+    "objecion": "Algo no me termina de convencer",
+    "cantidad": 0,
+    "problema": "Duda indefinida",
+    "solucion": "Preguntar cuál es exactamente esa duda."
+  },
+  {
+    "objecion": "Tengo una mala sensación",
+    "cantidad": 0,
+    "problema": "Desconfianza emocional",
+    "solucion": "Preguntar qué generó esa sensación."
+  },
+  {
+    "objecion": "No estoy cómodo con esto",
+    "cantidad": 0,
+    "problema": "Incomodidad percibida",
+    "solucion": "Identificar qué parte genera incomodidad."
+  },
+  {
+    "objecion": "Quiero pensarlo y después te aviso",
+    "cantidad": 0,
+    "problema": "Duda oculta",
+    "solucion": "Preguntar qué punto necesita evaluar antes."
+  },
+  {
+    "objecion": "Déjame consultarlo",
+    "cantidad": 0,
+    "problema": "Decisor externo",
+    "solucion": "Identificar qué necesita consultar."
+  },
+  {
+    "objecion": "Te llamo yo",
+    "cantidad": 0,
+    "problema": "Seguimiento incierto",
+    "solucion": "Acordar una instancia concreta de seguimiento."
+  },
+  {
+    "objecion": "Si me interesa te llamo",
+    "cantidad": 0,
+    "problema": "Interés indeterminado",
+    "solucion": "Preguntar qué tendría que conocer para decidir."
+  },
+  {
+    "objecion": "Después vemos",
+    "cantidad": 0,
+    "problema": "Decisión indefinida",
+    "solucion": "Preguntar qué debería resolverse primero."
+  },
+  {
+    "objecion": "Más adelante hablamos",
+    "cantidad": 0,
+    "problema": "Seguimiento incierto",
+    "solucion": "Definir una fecha concreta para retomar."
+  },
+  {
+    "objecion": "Por ahora paso",
+    "cantidad": 0,
+    "problema": "Rechazo temporal",
+    "solucion": "Preguntar qué condición cambiaría la decisión."
+  },
+  {
+    "objecion": "No quiero avanzar todavía",
+    "cantidad": 0,
+    "problema": "Compromiso insuficiente",
+    "solucion": "Preguntar qué necesita resolver antes."
+  },
+  {
+    "objecion": "No",
+    "cantidad": 0,
+    "problema": "Rechazo inicial",
+    "solucion": "Preguntar brevemente qué genera el rechazo."
+  },
+  {
+    "objecion": "No gracias",
+    "cantidad": 0,
+    "problema": "Rechazo inicial",
+    "solucion": "Validar y preguntar si existe algún motivo específico."
+  },
+  {
+    "objecion": "Paso",
+    "cantidad": 0,
+    "problema": "Rechazo inicial",
+    "solucion": "Preguntar qué aspecto no le resulta conveniente."
+  },
+  {
+    "objecion": "Ahora no",
+    "cantidad": 0,
+    "problema": "Timing inadecuado",
+    "solucion": "Preguntar cuándo sería conveniente."
+  },
+  {
+    "objecion": "No puedo",
+    "cantidad": 0,
+    "problema": "Restricción desconocida",
+    "solucion": "Preguntar qué se lo impide."
+  },
+  {
+    "objecion": "No quiero",
+    "cantidad": 0,
+    "problema": "Resistencia directa",
+    "solucion": "Preguntar qué genera esa decisión."
+  },
+  {
+    "objecion": "No me sirve",
+    "cantidad": 0,
+    "problema": "Encaje insuficiente",
+    "solucion": "Preguntar qué necesitaría que resolviera."
+  },
+  {
+    "objecion": "No me interesa",
+    "cantidad": 0,
+    "problema": "Interés insuficiente",
+    "solucion": "Preguntar qué aspecto no resulta relevante."
+  },
+  {
+    "objecion": "Necesito autorización",
+    "cantidad": 0,
+    "problema": "Autoridad insuficiente",
+    "solucion": "Identificar quién autoriza y qué necesita evaluar."
+  },
+  {
+    "objecion": "El presupuesto lo maneja otra persona",
+    "cantidad": 0,
+    "problema": "Presupuesto externo",
+    "solucion": "Identificar al responsable presupuestario."
+  },
+  {
+    "objecion": "Compras tiene que aprobarlo",
+    "cantidad": 0,
+    "problema": "Proceso interno",
+    "solucion": "Identificar requisitos del área de compras."
+  },
+  {
+    "objecion": "Tenemos que hacer una licitación",
+    "cantidad": 0,
+    "problema": "Proceso formal",
+    "solucion": "Preguntar requisitos y calendario del proceso."
+  },
+  {
+    "objecion": "Tenemos que esperar aprobación",
+    "cantidad": 0,
+    "problema": "Aprobación pendiente",
+    "solucion": "Identificar responsable y fecha estimada."
+  },
+  {
+    "objecion": "El presupuesto está cerrado",
+    "cantidad": 0,
+    "problema": "Presupuesto cerrado",
+    "solucion": "Preguntar cuándo se abre nuevamente."
+  },
+  {
+    "objecion": "Este año no tenemos presupuesto",
+    "cantidad": 0,
+    "problema": "Presupuesto inexistente",
+    "solucion": "Explorar planificación del próximo período."
+  },
+  {
+    "objecion": "No podemos contratar ahora",
+    "cantidad": 0,
+    "problema": "Restricción temporal",
+    "solucion": "Identificar cuándo podría habilitarse la compra."
+  },
+  {
+    "objecion": "¿Quién me va a ayudar?",
+    "cantidad": 0,
+    "problema": "Soporte incierto",
+    "solucion": "Explicar soporte y responsables."
+  },
+  {
+    "objecion": "¿Qué pasa después de comprar?",
+    "cantidad": 0,
+    "problema": "Proceso posterior",
+    "solucion": "Explicar claramente el proceso posterior."
+  },
+  {
+    "objecion": "¿Cuándo lo tendría?",
+    "cantidad": 0,
+    "problema": "Plazo incierto",
+    "solucion": "Informar plazo real y condiciones."
+  },
+  {
+    "objecion": "¿Cuánto tarda?",
+    "cantidad": 0,
+    "problema": "Plazo incierto",
+    "solucion": "Explicar tiempos reales del proceso."
+  },
+  {
+    "objecion": "¿Quién se encarga?",
+    "cantidad": 0,
+    "problema": "Responsabilidad incierta",
+    "solucion": "Identificar responsables de cada etapa."
+  },
+  {
+    "objecion": "¿Tengo soporte?",
+    "cantidad": 0,
+    "problema": "Soporte incierto",
+    "solucion": "Explicar canales y alcance del soporte."
+  },
+  {
+    "objecion": "¿Qué pasa si tengo un problema?",
+    "cantidad": 0,
+    "problema": "Soporte incierto",
+    "solucion": "Explicar procedimiento real de atención."
+  },
+  {
+    "objecion": "Quiero hablar con alguien más",
+    "cantidad": 0,
+    "problema": "Confianza insuficiente",
+    "solucion": "Preguntar qué necesita resolver con otra persona."
+  },
+  {
+    "objecion": "Quiero hablar con un supervisor",
+    "cantidad": 0,
+    "problema": "Autoridad percibida",
+    "solucion": "Identificar qué información necesita del supervisor."
+  },
+  {
+    "objecion": "¿Vos sos vendedor?",
+    "cantidad": 0,
+    "problema": "Rol cuestionado",
+    "solucion": "Confirmar rol y explicar cómo puede ayudar."
+  },
+  {
+    "objecion": "¿Hace cuánto trabajás ahí?",
+    "cantidad": 0,
+    "problema": "Credibilidad cuestionada",
+    "solucion": "Responder honestamente y respaldar con información."
+  },
+  {
+    "objecion": "Quiero hablar con alguien que sepa",
+    "cantidad": 0,
+    "problema": "Credibilidad cuestionada",
+    "solucion": "Aclarar conocimientos y ofrecer derivación si corresponde."
+  },
+  {
+    "objecion": "No creo en lo que me decís",
+    "cantidad": 0,
+    "problema": "Credibilidad insuficiente",
+    "solucion": "Respaldar afirmaciones con información verificable."
+  },
+  {
+    "objecion": "Tengo que cortar",
+    "cantidad": 0,
+    "problema": "Tiempo insuficiente",
+    "solucion": "Acordar un momento concreto para continuar."
+  },
+  {
+    "objecion": "Me tengo que ir",
+    "cantidad": 0,
+    "problema": "Tiempo insuficiente",
+    "solucion": "Preguntar cuándo puede retomarse."
+  },
+  {
+    "objecion": "Después hablamos",
+    "cantidad": 0,
+    "problema": "Seguimiento incierto",
+    "solucion": "Definir fecha y horario."
+  },
+  {
+    "objecion": "Te escribo después",
+    "cantidad": 0,
+    "problema": "Seguimiento incierto",
+    "solucion": "Acordar una instancia concreta de seguimiento."
+  },
+  {
+    "objecion": "Ahora no puedo seguir",
+    "cantidad": 0,
+    "problema": "Tiempo insuficiente",
+    "solucion": "Acordar cuándo continuar."
+  },
+  {
+    "objecion": "Tengo otra llamada",
+    "cantidad": 0,
+    "problema": "Tiempo insuficiente",
+    "solucion": "Coordinar un horario posterior."
+  },
+  {
+    "objecion": "Estoy por entrar a una reunión",
+    "cantidad": 0,
+    "problema": "Momento inconveniente",
+    "solucion": "Acordar horario posterior."
+  },
+  {
+    "objecion": "Quiero saber el precio final",
+    "cantidad": 0,
+    "problema": "Costo incierto",
+    "solucion": "Aclarar todos los componentes del precio."
+  },
+  {
+    "objecion": "¿Hay costos adicionales?",
+    "cantidad": 0,
+    "problema": "Costo incierto",
+    "solucion": "Detallar costos obligatorios y opcionales."
+  },
+  {
+    "objecion": "¿Hay gastos ocultos?",
+    "cantidad": 0,
+    "problema": "Desconfianza económica",
+    "solucion": "Explicar transparentemente todos los costos."
+  },
+  {
+    "objecion": "No quiero sorpresas",
+    "cantidad": 0,
+    "problema": "Desconfianza económica",
+    "solucion": "Detallar condiciones y costos antes de avanzar."
+  },
+  {
+    "objecion": "Quiero saber todo antes",
+    "cantidad": 0,
+    "problema": "Información insuficiente",
+    "solucion": "Preguntar qué información considera indispensable."
+  },
+  {
+    "objecion": "¿Me garantizás el resultado?",
+    "cantidad": 0,
+    "problema": "Resultado incierto",
+    "solucion": "Explicar resultados esperables sin prometer imposibles."
+  },
+  {
+    "objecion": "¿Cuándo voy a ver resultados?",
+    "cantidad": 0,
+    "problema": "Resultado incierto",
+    "solucion": "Explicar plazos realistas y variables."
+  },
+  {
+    "objecion": "Necesito resultados rápidos",
+    "cantidad": 0,
+    "problema": "Expectativa temporal",
+    "solucion": "Alinear expectativas con resultados realistas."
+  },
+  {
+    "objecion": "No quiero esperar",
+    "cantidad": 0,
+    "problema": "Impaciencia temporal",
+    "solucion": "Explicar plazos reales y alternativas."
+  },
+  {
+    "objecion": "¿Qué pasa si no obtengo resultados?",
+    "cantidad": 0,
+    "problema": "Riesgo de resultado",
+    "solucion": "Explicar condiciones, límites y soporte."
+  },
+  {
+    "objecion": "Necesito una mejor oferta",
+    "cantidad": 0,
+    "problema": "Valor insuficiente",
+    "solucion": "Preguntar qué condición necesita mejorar."
+  },
+  {
+    "objecion": "¿Me podés mejorar el precio?",
+    "cantidad": 0,
+    "problema": "Negociación económica",
+    "solucion": "Preguntar qué condición justificaría avanzar."
+  },
+  {
+    "objecion": "Si me hacés descuento compro",
+    "cantidad": 0,
+    "problema": "Precio condicionante",
+    "solucion": "Confirmar si el precio es realmente la única barrera."
+  },
+  {
+    "objecion": "Si bajás el precio lo hago",
+    "cantidad": 0,
+    "problema": "Precio condicionante",
+    "solucion": "Aislar la objeción antes de negociar."
+  },
+  {
+    "objecion": "Quiero una promoción",
+    "cantidad": 0,
+    "problema": "Precio condicionante",
+    "solucion": "Confirmar qué condición económica necesita."
+  },
+  {
+    "objecion": "Quiero esperar una promoción",
+    "cantidad": 0,
+    "problema": "Espera económica",
+    "solucion": "Preguntar qué beneficio espera obtener."
+  },
+  {
+    "objecion": "Quiero esperar una oferta",
+    "cantidad": 0,
+    "problema": "Espera económica",
+    "solucion": "Preguntar qué condición determinaría su decisión."
+  },
+  {
+    "objecion": "No compro si no hay descuento",
+    "cantidad": 0,
+    "problema": "Precio condicionante",
+    "solucion": "Confirmar si existen otras barreras además del precio."
+  }
+]

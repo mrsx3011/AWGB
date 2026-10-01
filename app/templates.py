@@ -5,44 +5,119 @@ HTML_LOGIN = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iniciar sesión</title>
-    <style>%%BASE_CSS%%
-
-        body.login-body{
+    <style>
+        :root{
+            --bg:#08090B;
+            --grid-line:rgba(255,255,255,.05);
+            --panel:rgba(20,22,26,.62);
+            --panel-border:rgba(255,255,255,.09);
+            --ink-900:#F5F6F7;
+            --ink-600:#9AA3AD;
+            --ink-400:#6B747E;
+            --accent:#39FF9E;
+            --accent-dim:rgba(57,255,158,.14);
+            --danger:#FF5C5C;
+            --danger-bg:rgba(255,92,92,.12);
+            --radius:14px;
+        }
+        *{ box-sizing:border-box; }
+        html,body{ height:100%; }
+        body{
+            margin:0;
+            font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+            background:
+                radial-gradient(1100px 550px at 15% -10%, rgba(57,255,158,.10), transparent 55%),
+                radial-gradient(900px 500px at 100% 110%, rgba(60,120,255,.10), transparent 55%),
+                var(--bg);
+            color:var(--ink-900);
+            -webkit-font-smoothing:antialiased;
+            position:relative;
+            overflow-x:hidden;
+        }
+        body::before{
+            content:"";
+            position:fixed; inset:0;
+            background-image:
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size:42px 42px;
+            mask-image:radial-gradient(circle at 50% 30%, black 0%, transparent 72%);
+            pointer-events:none;
+        }
+        .login-body{
             min-height:100vh; display:flex; align-items:center; justify-content:center;
-            padding:24px 16px;
+            padding:24px 16px; position:relative; z-index:1;
         }
         .login-box{ width:100%; max-width:400px; }
 
-        .login-head{ text-align:center; margin-bottom:22px; }
+        .login-head{ text-align:center; margin-bottom:28px; }
         .login-logo{
-            width:56px; height:56px; margin:0 auto 14px; border-radius:16px;
-            background:var(--brand-100); color:var(--brand-600);
-            display:flex; align-items:center; justify-content:center; font-size:26px;
-            border:1px solid #cfe5ee; box-shadow:var(--shadow-card);
+            width:52px; height:52px; margin:0 auto 20px; border-radius:13px;
+            background:linear-gradient(155deg, rgba(57,255,158,.16), rgba(57,255,158,.02));
+            border:1px solid rgba(57,255,158,.28);
+            display:flex; align-items:center; justify-content:center; font-size:22px;
+            box-shadow:0 0 0 1px rgba(255,255,255,.02), 0 12px 28px rgba(57,255,158,.08);
         }
-        .login-head h2{ font-size:22px; }
-        .login-sub{ font-size:13.5px; color:var(--ink-600); margin-top:6px; }
+        .login-head h2{
+            font-size:24px; font-weight:700; letter-spacing:-0.03em; margin:0; color:var(--ink-900);
+        }
+        .login-sub{ font-size:13.5px; color:var(--ink-600); margin-top:8px; letter-spacing:-.01em; }
 
-        .login-card{ padding:24px 22px; }
+        .login-card{
+            background:var(--panel);
+            border:1px solid var(--panel-border);
+            border-radius:var(--radius);
+            padding:28px 24px;
+            backdrop-filter:blur(18px);
+            -webkit-backdrop-filter:blur(18px);
+            box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 20px 50px rgba(0,0,0,.45);
+        }
 
         .alert-error{
-            background:var(--red-100); color:var(--red-700); border:1px solid #efc7c2;
-            padding:11px 14px; margin-bottom:16px; border-radius:var(--radius-sm);
-            font-size:13.5px; font-weight:500;
+            background:var(--danger-bg); color:var(--danger); border:1px solid rgba(255,92,92,.28);
+            padding:11px 14px; margin-bottom:18px; border-radius:9px;
+            font-size:13px; font-weight:600;
+        }
+
+        .field{ margin-bottom:16px; }
+        label{
+            display:block; margin-bottom:7px; font-weight:600; font-size:12px;
+            color:var(--ink-600); letter-spacing:.03em; text-transform:uppercase;
+        }
+        input[type="text"], input[type="password"]{
+            width:100%; padding:12px 14px; border:1px solid rgba(255,255,255,.10);
+            border-radius:9px; font-size:14.5px; background:rgba(255,255,255,.03); color:var(--ink-900);
+            font-family:inherit; transition:border-color .15s ease, background .15s ease, box-shadow .15s ease;
+        }
+        input::placeholder{ color:var(--ink-400); }
+        input:focus{
+            outline:none; border-color:var(--accent); background:rgba(255,255,255,.045);
+            box-shadow:0 0 0 3px var(--accent-dim);
         }
 
         .input-wrap{ position:relative; }
         .input-wrap input{ padding-right:44px; }
         .toggle-pass{
-            position:absolute; right:6px; top:50%; transform:translateY(-50%);
+            position:absolute; right:5px; top:50%; transform:translateY(-50%);
             width:34px; height:34px; border:none; background:none; cursor:pointer;
-            border-radius:8px; font-size:16px; color:var(--ink-600);
+            border-radius:7px; font-size:15px; color:var(--ink-600);
             display:flex; align-items:center; justify-content:center;
+            transition:background .15s ease, color .15s ease;
         }
-        .toggle-pass:hover{ background:var(--paper); }
+        .toggle-pass:hover{ background:rgba(255,255,255,.06); color:var(--ink-900); }
 
-        .btn-primary:disabled{ opacity:.7; cursor:wait; }
-        .login-foot{ text-align:center; font-size:11.5px; color:var(--ink-300); margin-top:18px; }
+        .btn-primary{
+            width:100%; margin-top:6px; padding:13px 16px; border:none; border-radius:9px;
+            background:var(--accent); color:#06110B; font-size:14.5px; font-weight:700;
+            cursor:pointer; letter-spacing:-.01em;
+            transition:transform .12s ease, box-shadow .12s ease, filter .12s ease;
+            box-shadow:0 10px 24px rgba(57,255,158,.18);
+        }
+        .btn-primary:hover{ filter:brightness(1.06); transform:translateY(-1px); box-shadow:0 14px 30px rgba(57,255,158,.24); }
+        .btn-primary:active{ transform:translateY(0); }
+        .btn-primary:disabled{ opacity:.65; cursor:wait; transform:none; }
+
+        .login-foot{ text-align:center; font-size:11.5px; color:var(--ink-400); margin-top:22px; letter-spacing:.02em; }
     </style>
 </head>
 <body class="login-body">
@@ -53,7 +128,7 @@ HTML_LOGIN = """
         <div class="login-sub">Ingresá para registrar y enviar tus locales</div>
     </div>
 
-    <div class="card login-card">
+    <div class="login-card">
         {% with messages = get_flashed_messages() %}
           {% if messages %}{% for message in messages %}<div class="alert-error">{{ message }}</div>{% endfor %}{% endif %}
         {% endwith %}
@@ -62,7 +137,7 @@ HTML_LOGIN = """
             <div class="field">
                 <label for="identificador">Usuario o email</label>
                 <input type="text" id="identificador" name="identificador" required autofocus
-                       autocomplete="username" placeholder="Ej: tuusuario">
+                       autocomplete="username" placeholder="tuusuario">
             </div>
 
             <div class="field">
@@ -91,14 +166,12 @@ HTML_LOGIN = """
         btn.textContent = oculto ? '🙈' : '👁️';
     }
 
-    // Evita el doble envío (en tu log aparecía POST /login dos veces)
     const form = document.getElementById('loginForm');
     const btn = document.getElementById('btnEntrar');
     form.addEventListener('submit', function () {
         btn.disabled = true;
         btn.textContent = 'Entrando...';
     });
-    // Si el usuario vuelve con el botón "atrás", se rehabilita el botón
     window.addEventListener('pageshow', function () {
         btn.disabled = false;
         btn.textContent = 'Entrar';
@@ -107,7 +180,6 @@ HTML_LOGIN = """
 </body>
 </html>
 """
-
 
 # ============================================================================
 # DISEÑO
@@ -1558,6 +1630,215 @@ document.getElementById('profilePhotoInput').addEventListener('change', event =>
 });
 loadProfilePhoto();
 renderProfileStats();
+</script>
+</body>
+</html>
+"""
+
+
+HTML_STATS_REDESIGNED = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estadísticas</title>
+    <style>""" + BASE_CSS + """
+        .stats-v2-shell{ max-width:1240px; margin:0 auto; }
+        .stats-workspace{ display:grid; grid-template-columns:270px minmax(0,1fr); gap:16px; align-items:start; }
+        .stats-sidebar,.stats-panel{ background:#202832; border:1px solid #303B46; border-radius:10px; box-shadow:0 12px 30px rgba(0,0,0,.18); }
+        .stats-sidebar{ overflow:visible; }
+        .stats-profile{ padding:20px 18px; border-bottom:1px solid #303B46; border-radius:10px 10px 0 0; }
+        .stats-profile h1{ color:#F4F7FA; font-size:22px; margin:0 0 4px; letter-spacing:-.02em; }
+        .stats-profile p{ color:#93A2B0; font-size:12px; margin:0; }
+        .stats-profile-line{ height:3px; width:54px; background:#2DDB8A; margin:14px 0 0; }
+        .seller-badges{ display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 14px; }
+        .seller-badge{ position:relative; display:inline-flex; align-items:center; min-height:22px; padding:0 9px; border:1px solid transparent; border-radius:3px; font-size:10px; font-weight:800; letter-spacing:0; cursor:help; }
+        .seller-badge::after{ content:attr(data-tooltip); position:absolute; z-index:20; left:0; top:calc(100% + 8px); width:220px; padding:10px 11px; border-radius:6px; background:#11171D; color:#EFF4F7; box-shadow:0 12px 24px rgba(0,0,0,.28); font-size:11px; font-weight:500; line-height:1.4; letter-spacing:0; text-transform:none; opacity:0; pointer-events:none; transform:translateY(-3px); transition:opacity .16s ease, transform .16s ease; }
+        .seller-badge:hover::after{ opacity:1; transform:translateY(0); }
+        .seller-badge.yellow{ color:#FFD978; background:rgba(240,184,75,.16); border-color:rgba(240,184,75,.55); }
+        .seller-badge.red{ color:#FF9B94; background:rgba(224,91,82,.16); border-color:rgba(224,91,82,.55); }
+        .seller-badge.green{ color:#76F0B5; background:rgba(45,219,138,.14); border-color:rgba(45,219,138,.52); }
+        .rank-stack{ display:grid; }
+        .rank-card{ padding:18px; border-bottom:1px solid #303B46; }
+        .rank-card:last-child{ border-bottom:0; }
+        .rank-label{ color:#93A2B0; font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+        .rank-value{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-top:8px; }
+        .rank-value strong{ color:#F4F7FA; font-size:20px; }
+        .rank-value span{ color:#D1D9E0; font-size:13px; font-weight:700; }
+        .rank-meter{ height:5px; background:#11171D; border-radius:99px; overflow:hidden; margin-top:12px; }
+        .rank-meter i{ display:block; height:100%; width:0; border-radius:99px; background:#2DDB8A; transition:width .45s ease; }
+        .rank-card:nth-child(2) .rank-meter i{ background:#F0B84B; }
+        .rank-card:nth-child(3) .rank-meter i{ background:#7CA7FF; }
+        .lp-sidebar{ border-top:1px solid #303B46; padding:18px; border-radius:0 0 10px 10px; }
+        .lp-sidebar h3{ color:#F4F7FA; font-size:12px; text-transform:uppercase; letter-spacing:.08em; margin:0 0 3px; }
+        .lp-sidebar p{ color:#93A2B0; font-size:11px; margin:0 0 12px; }
+        .lp-mini{ width:100%; height:90px; display:block; background:#171D24; border:1px solid #303B46; border-radius:7px; }
+        .stats-main{ display:grid; gap:16px; min-width:0; }
+        .stats-panel{ padding:20px; }
+        .stats-panel.light{ background:var(--surface); border-color:var(--line); }
+        .panel-header{ display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:16px; }
+        .panel-header h2{ color:#F4F7FA; font-size:15px; text-transform:uppercase; letter-spacing:.05em; }
+        .light .panel-header h2{ color:var(--ink-900); }
+        .panel-header p{ color:#93A2B0; font-size:12px; margin:5px 0 0; }
+        .light .panel-header p{ color:var(--ink-600); }
+        .gpi-overview{ display:grid; grid-template-columns:minmax(250px,.8fr) minmax(0,1.5fr); gap:20px; }
+        .radar-wrap{ min-height:290px; display:grid; place-items:center; background:#171D24; border:1px solid #303B46; border-radius:8px; }
+        .radar{ width:100%; max-width:300px; height:auto; }
+        .radar-grid{ fill:none; stroke:#35424F; stroke-width:1; }
+        .radar-axis{ stroke:#35424F; stroke-width:1; }
+        .radar-shape{ fill:rgba(45,219,138,.2); stroke:#F0B84B; stroke-width:2; transition:all .4s ease; }
+        .radar-label{ fill:#AAB7C3; font-size:10px; font-weight:600; }
+        .daily-table{ width:100%; border-collapse:collapse; }
+        .daily-table th{ background:transparent; color:#8293A3; border-bottom:1px solid #303B46; padding:8px 10px; font-size:10px; letter-spacing:.06em; text-transform:uppercase; text-align:left; }
+        .daily-table td{ color:#E7EDF2; border-bottom:1px solid #2A353F; padding:12px 10px; font-size:12.5px; }
+        .daily-table tr:last-child td{ border-bottom:0; }
+        .daily-table .day-name{ color:#fff; font-weight:700; }
+        .daily-table .number{ color:#2DDB8A; font-weight:800; }
+        .daily-empty{ color:#93A2B0; font-size:12.5px; padding:20px 10px; }
+        .performance-grid{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+        .performance-card{ background:#F6F8FA; border:1px solid #E3E9EE; border-radius:8px; padding:15px 12px; }
+        .performance-card strong{ display:block; color:var(--ink-900); font-size:23px; line-height:1; }
+        .performance-card span{ display:block; color:var(--ink-600); font-size:11px; margin-top:8px; line-height:1.3; }
+        .lp-panel{ background:#202832; }
+        .lp-chart-wrap{ background:#171D24; border:1px solid #303B46; border-radius:8px; padding:10px; }
+        .lp-chart{ width:100%; height:230px; display:block; }
+        .lp-grid-line{ stroke:#35424F; stroke-width:1; stroke-dasharray:3 4; }
+        .lp-axis-label{ fill:#8293A3; font-size:10px; }
+        .lp-line{ fill:none; stroke:#2DDB8A; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+        .lp-point{ fill:#F0B84B; stroke:#171D24; stroke-width:2; }
+        .search-panel{ position:relative; }
+        .search-input{ width:100%; min-height:44px; padding:0 14px; border:1px solid #CBD5DE; border-radius:7px; font:inherit; color:var(--ink-900); }
+        .search-input:focus{ outline:0; border-color:var(--brand-600); box-shadow:0 0 0 3px rgba(31,95,139,.14); }
+        .suggestions{ position:absolute; z-index:20; left:0; right:0; top:72px; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 15px 30px rgba(16,24,40,.16); overflow:hidden; display:none; }
+        .suggestions.open{ display:block; }
+        .suggestion{ display:block; width:100%; border:0; border-bottom:1px solid #EEF1F4; background:#fff; padding:11px 13px; text-align:left; cursor:pointer; }
+        .suggestion:last-child{ border-bottom:0; }
+        .suggestion:hover{ background:var(--brand-100); }
+        .suggestion strong{ display:block; color:var(--ink-900); font-size:13px; }
+        .suggestion small{ display:block; color:var(--ink-600); font-size:11px; margin-top:3px; }
+        .stats-entry{ display:grid; grid-template-columns:1.3fr .6fr; gap:16px; align-items:end; }
+        .heard-actions{ display:flex; gap:8px; }
+        .heard-actions button{ flex:1; min-height:42px; border:1px solid var(--line); border-radius:7px; background:var(--surface); color:var(--ink-700); font-weight:750; cursor:pointer; transition:all .16s ease; }
+        .heard-actions button:hover{ transform:translateY(-1px); }
+        .heard-actions .yes:hover{ border-color:var(--green-600); color:var(--green-700); background:var(--green-100); }
+        .heard-actions .no:hover{ border-color:var(--red-600); color:var(--red-700); background:var(--red-100); }
+        .sales-stepper{ display:flex; align-items:center; justify-content:space-between; gap:9px; }
+        .sales-stepper button{ width:35px; height:35px; border:1px solid var(--line); border-radius:7px; background:#fff; cursor:pointer; font-size:18px; color:var(--ink-700); }
+        .sales-stepper strong{ font-size:22px; color:var(--ink-900); }
+        .entry-status{ min-height:18px; margin-top:12px; font-size:12px; font-weight:650; }
+        .entry-status.success{ color:var(--green-700); }.entry-status.error{ color:var(--red-700); }.entry-status.loading{ color:var(--brand-700); }
+        .objection-tags{ display:flex; flex-wrap:wrap; gap:8px; }
+        .objection-tag{ position:relative; display:inline-flex; align-items:center; gap:7px; padding:8px 10px; border:1px solid #D7E0E7; border-radius:7px; background:#F8FAFB; color:var(--ink-700); font-size:12px; cursor:help; }
+        .objection-tag .tag-count{ color:var(--ink-600); font-weight:800; }
+        .objection-tag.tag-warning{ border-color:#E4BD58; background:#FFF8E9; color:#765008; }.objection-tag.tag-danger{ border-color:#E6A19C; background:#FFF0EE; color:#8D2C25; }
+        .objection-tooltip{ position:absolute; z-index:15; bottom:calc(100% + 8px); left:0; width:240px; padding:11px 12px; border-radius:7px; background:#11171D; color:#EFF4F7; box-shadow:0 12px 24px rgba(0,0,0,.18); opacity:0; pointer-events:none; transform:translateY(4px); transition:all .16s ease; }
+        .objection-tag:hover .objection-tooltip{ opacity:1; transform:translateY(0); }
+        .objection-tooltip strong{ display:block; color:#F0B84B; font-size:11px; margin-bottom:5px; }.objection-tooltip span{ display:block; font-size:11px; line-height:1.4; }
+        @media(max-width:980px){ .stats-workspace{ grid-template-columns:1fr; }.stats-sidebar{ display:grid; grid-template-columns:1.1fr 1fr 1fr; }.stats-profile{ border-bottom:0; border-right:1px solid #303B46; }.rank-stack{ grid-column:2 / -1; grid-template-columns:repeat(3,1fr); }.rank-card{ border-bottom:0; border-right:1px solid #303B46; }.rank-card:last-child{ border-right:0; }.lp-sidebar{ grid-column:1 / -1; border-top:1px solid #303B46; } }
+        @media(max-width:700px){ body{ padding:16px 10px 50px; }.stats-sidebar{ display:block; }.stats-profile{ border-right:0; border-bottom:1px solid #303B46; }.rank-stack{ display:grid; grid-template-columns:1fr; }.rank-card{ border-right:0; border-bottom:1px solid #303B46; }.gpi-overview,.stats-entry{ grid-template-columns:1fr; }.performance-grid{ grid-template-columns:repeat(2,1fr); }.daily-table{ min-width:620px; }.stats-panel{ overflow:hidden; } }
+    </style>
+</head>
+<body>
+<main class="stats-v2-shell">
+    <div class="topbar">
+        <h2>Estadísticas</h2>
+        <div class="navlinks">
+            <a href="{{ url_for('index') }}">Nuevo registro</a><a href="{{ url_for('dashboard') }}">Dashboard</a><a href="{{ url_for('lista') }}">Lista</a><a href="{{ url_for('perfil') }}">Perfil</a><a href="{{ url_for('logout') }}">Cerrar sesión</a>
+        </div>
+    </div>
+    <div class="stats-workspace">
+        <aside class="stats-sidebar">
+            <section class="stats-profile"><h1>{{ usuario }}</h1><div class="seller-badges" id="sellerBadges" aria-live="polite"></div><p>Panel de rendimiento comercial</p><div class="stats-profile-line"></div></section>
+            <div class="rank-stack">
+                <div class="rank-card"><div class="rank-label">Clientes que te escucharon</div><div class="rank-value"><strong id="soloValue">0%</strong><span>Atención</span></div><div class="rank-meter"><i id="soloMeter"></i></div></div>
+                <div class="rank-card"><div class="rank-label">Porcentaje de ventas</div><div class="rank-value"><strong id="flexValue">0%</strong><span>Venta bruta</span></div><div class="rank-meter"><i id="flexMeter"></i></div></div>
+                <div class="rank-card"><div class="rank-label">Probabilidad de venta actual</div><div class="rank-value"><strong id="draftValue">0%</strong><span>Próxima venta</span></div><div class="rank-meter"><i id="draftMeter"></i></div></div>
+            </div>
+            <section class="lp-sidebar"><h3>Gráfico de ventas</h3><p id="lpSidebarMeta">Mes actual</p><svg class="lp-mini" id="lpMiniChart" viewBox="0 0 240 90" role="img" aria-label="Progreso mensual"></svg></section>
+        </aside>
+        <div class="stats-main">
+            <section class="stats-panel">
+                <div class="panel-header"><div><h2>GPI</h2><p>Índice de rendimiento general del período actual</p></div><span class="badge badge-enviado">En seguimiento</span></div>
+                <div class="gpi-overview">
+                    <div class="radar-wrap"><svg class="radar" viewBox="0 0 300 300" role="img" aria-label="Gráfico GPI"><polygon class="radar-grid" points="150,35 259,114 217,246 83,246 41,114"></polygon><polygon class="radar-grid" points="150,68 232,127 201,221 99,221 68,127"></polygon><polygon class="radar-grid" points="150,101 204,140 185,196 115,196 96,140"></polygon><line class="radar-axis" x1="150" y1="35" x2="150" y2="150"></line><line class="radar-axis" x1="259" y1="114" x2="150" y2="150"></line><line class="radar-axis" x1="217" y1="246" x2="150" y2="150"></line><line class="radar-axis" x1="83" y1="246" x2="150" y2="150"></line><line class="radar-axis" x1="41" y1="114" x2="150" y2="150"></line><polygon id="gpiShape" class="radar-shape" points="150,150 150,150 150,150 150,150 150,150"></polygon><text class="radar-label" x="150" y="19" text-anchor="middle">Constancia</text><text class="radar-label" x="276" y="111">Ventas</text><text class="radar-label" x="224" y="268">Atención</text><text class="radar-label" x="51" y="268" text-anchor="end">Objeciones</text><text class="radar-label" x="24" y="111" text-anchor="end">Venta %</text></svg></div>
+                    <div><div class="panel-header"><div><h2>Registro de estadísticas</h2><p>Rendimiento diario del mes</p></div></div><div style="overflow:auto"><table class="daily-table"><thead><tr><th>Día</th><th>Locales</th><th>Venta bruta</th><th>Atención</th><th>Ventas</th></tr></thead><tbody id="dailyRows"></tbody></table></div></div>
+                </div>
+            </section>
+            <section class="stats-panel light"><div class="panel-header"><div><h2>Estadísticas del vendedor</h2><p>Resumen operativo del período y del día actual</p></div></div><div class="performance-grid"><div class="performance-card"><strong id="monthVisitors">0</strong><span>Locales visitados este mes</span></div><div class="performance-card"><strong id="todayVisitors">0</strong><span>Locales visitados hoy</span></div><div class="performance-card"><strong id="todaySales">0</strong><span>Ventas de hoy</span></div><div class="performance-card"><strong id="monthSales">0</strong><span>Ventas del mes</span></div><div class="performance-card"><strong id="todayRate">0%</strong><span>Venta de hoy</span></div></div></section>
+            <section class="stats-panel lp-panel"><div class="panel-header"><div><h2>Gráfico de ventas</h2><p>Locales visitados versus ventas acumuladas</p></div><span class="badge badge-enviado" id="lpMeta">0 locales · 0 ventas</span></div><div class="lp-chart-wrap"><svg class="lp-chart" id="lpChart" viewBox="0 0 760 230" role="img" aria-label="Progreso de locales y ventas"><line class="lp-grid-line" x1="50" y1="25" x2="730" y2="25"></line><line class="lp-grid-line" x1="50" y1="75" x2="730" y2="75"></line><line class="lp-grid-line" x1="50" y1="125" x2="730" y2="125"></line><line class="lp-grid-line" x1="50" y1="175" x2="730" y2="175"></line><text class="lp-axis-label" x="4" y="29">ventas</text><text class="lp-axis-label" x="50" y="216">locales visitados</text><polyline id="lpLine" class="lp-line" points="50,175 730,175"></polyline><g id="lpPoints"></g></svg></div></section>
+            <section class="stats-panel light"><div class="panel-header"><div><h2>Registrar visita</h2><p>Buscá una objeción del catálogo y seleccioná la sugerencia correspondiente.</p></div></div><div class="stats-entry"><div><label>¿El cliente te escuchó?</label><div class="heard-actions"><button type="button" class="yes" id="heardYes">Sí</button><button type="button" class="no" id="heardNo">No</button></div></div><div><label>Ventas obtenidas</label><div class="sales-stepper"><button type="button" id="salesDown" aria-label="Restar venta">−</button><strong id="salesValue">0</strong><button type="button" id="salesUp" aria-label="Sumar venta">+</button></div></div></div><div class="search-panel" style="margin-top:16px"><label for="objectionSearch">Buscar objeción</label><input id="objectionSearch" class="search-input" type="search" autocomplete="off" placeholder="Escribí lo que te respondió el cliente"><div class="suggestions" id="suggestions" role="listbox"></div></div><div class="entry-status" id="entryStatus" role="status" aria-live="polite"></div></section>
+            <section class="stats-panel light"><div class="panel-header"><div><h2>Objeciones frecuentes</h2><p>Las etiquetas amarillas superan el 20% de los clientes que dijeron Sí; las rojas superan el 50%.</p></div></div><div class="objection-tags" id="objectionTags"></div></section>
+        </div>
+    </div>
+</main>
+<script>
+const redesignedStorageKey = 'gednet-estadisticas-v1-' + {{ usuario|tojson }};
+const redesignedHistoryKey = 'gednet-estadisticas-historial-v1-' + {{ usuario|tojson }};
+const objectionCatalog = {{ catalogo|tojson }};
+const defaultRedesignedStats = { yes:0, no:0, sales:0, objections:[], days:{}, currentStreak:0, periodMonth:'' };
+function today() {
+    const date = new Date();
+    return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+}
+function monthOf(date) { return date.slice(0,7); }
+function currentMonth() { return monthOf(today()); }
+
+let redesignedStats = loadRedesignedStats();
+function normalize(value){ return String(value || '').trim().toLocaleLowerCase(); }
+function emptyDay(){ return { yes:0, no:0, sales:0 }; }
+function snapshotStats(value){ return { yes:Number(value.yes||0), no:Number(value.no||0), sales:Number(value.sales||0), objections:(value.objections||[]).map(item => ({text:item.text,count:Number(item.count||0),problema:item.problema||'',solucion:item.solucion||''})) }; }
+function loadRedesignedStats(){
+    let saved={}; try { saved=JSON.parse(localStorage.getItem(redesignedStorageKey)) || {}; } catch(error) {}
+    const value={...defaultRedesignedStats,...saved,days:{...(saved.days||{})},objections:Array.isArray(saved.objections)?saved.objections:[]};
+    value.objections=value.objections.map(item => { const catalog=objectionCatalog.find(entry => normalize(entry.objecion)===normalize(item.text||item.objecion)); return {...item,text:item.text||item.objecion||'',count:Number(item.count||item.cantidad||0),problema:item.problema||catalog?.problema||'',solucion:item.solucion||catalog?.solucion||'',createdAt:item.createdAt||Date.now()}; });
+    if(!value.periodMonth) value.periodMonth=currentMonth();
+    if(value.periodMonth!==currentMonth()){
+        let history=[]; try{history=JSON.parse(localStorage.getItem(redesignedHistoryKey))||[];}catch(error){}
+        history=[{month:value.periodMonth,stats:snapshotStats(value),savedAt:new Date().toISOString()},...history.filter(item=>item.month!==value.periodMonth)];
+        localStorage.setItem(redesignedHistoryKey,JSON.stringify(history));
+        const reset={...defaultRedesignedStats,periodMonth:currentMonth()};
+        localStorage.setItem(redesignedStorageKey,JSON.stringify(reset));
+        return reset;
+    }
+    return value;
+}
+function saveRedesignedStats(){ localStorage.setItem(redesignedStorageKey,JSON.stringify(redesignedStats)); }
+function setStatus(text,type){ const node=document.getElementById('entryStatus'); node.textContent=text; node.className='entry-status '+(type||''); }
+function dayStats(key=today()){ return redesignedStats.days[key] || emptyDay(); }
+function changeResponse(kind){ const key=today(); const day={...dayStats(key)}; day[kind]++; redesignedStats[kind]++; redesignedStats.days[key]=day; redesignedStats.currentStreak=Number(redesignedStats.currentStreak||0)+1; saveRedesignedStats(); setStatus('Respuesta guardada.','success'); renderAll(); }
+function changeSales(delta){ const key=today(); const day={...dayStats(key)}; const next=Math.max(0,Number(redesignedStats.sales||0)+delta); const actual=next-Number(redesignedStats.sales||0); redesignedStats.sales=next; day.sales=Math.max(0,Number(day.sales||0)+actual); redesignedStats.days[key]=day; if(delta>0) redesignedStats.currentStreak=0; saveRedesignedStats(); setStatus(delta>0?'Venta registrada.':'Venta actualizada.','success'); renderAll(); }
+function scoreSuggestion(query,item){ const words=normalize(query).split(/\s+/).filter(Boolean); const hay=normalize(item.objecion+' '+item.problema+' '+item.solucion); return words.reduce((score,word)=>score+(hay.includes(word)?(normalize(item.objecion).includes(word)?4:1):0),0); }
+function renderSuggestions(query){ const box=document.getElementById('suggestions'); const clean=normalize(query); if(!clean){box.classList.remove('open');box.innerHTML='';return;} const matches=objectionCatalog.map((item,index)=>({item,index,score:scoreSuggestion(clean,item)})).filter(result=>result.score>0).sort((a,b)=>b.score-a.score||a.item.objecion.localeCompare(b.item.objecion)).slice(0,7); box.innerHTML=''; if(!matches.length){box.classList.remove('open');return;} matches.forEach(result=>{const button=document.createElement('button');button.type='button';button.className='suggestion';button.innerHTML='<strong>'+escapeHtml(result.item.objecion)+'</strong><small>'+escapeHtml(result.item.problema)+'</small>';button.addEventListener('click',()=>selectObjection(result.item));box.appendChild(button);});box.classList.add('open');}
+function selectObjection(item){ const existing=redesignedStats.objections.find(entry=>normalize(entry.text)===normalize(item.objecion)); if(existing){existing.count=Number(existing.count||0)+1;existing.problema=item.problema;existing.solucion=item.solucion;}else redesignedStats.objections.push({id:Date.now().toString(36),text:item.objecion,count:1,problema:item.problema,solucion:item.solucion,createdAt:Date.now()}); saveRedesignedStats(); document.getElementById('objectionSearch').value='';document.getElementById('suggestions').classList.remove('open');setStatus('Objeción guardada en tus estadísticas.','success');renderAll();}
+function escapeHtml(value){const node=document.createElement('span');node.textContent=value;return node.innerHTML;}
+function percentage(value,total){return total?Math.round(value/total*100):0;}
+function formatDay(key){const date=new Date(key+'T12:00:00');return 'Día '+date.getDate()+' · '+date.toLocaleDateString('es-AR',{weekday:'long',month:'long'});}
+function renderRanks(){ const total=Number(redesignedStats.yes||0)+Number(redesignedStats.no||0);const solo=percentage(redesignedStats.yes,total);const flex=total?Math.round(Number(redesignedStats.sales||0)/total*100):0;const next=total?Math.min(100,Math.round(flex+(Number(redesignedStats.currentStreak||0)*(100-flex)/Math.max(1,total)))):0;[['soloValue','soloMeter',solo],['flexValue','flexMeter',flex],['draftValue','draftMeter',next]].forEach(([value,meter,number])=>{document.getElementById(value).textContent=number+'%';document.getElementById(meter).style.width=Math.min(100,number)+'%';});}
+function renderSellerBadges(){
+    const container=document.getElementById('sellerBadges');
+    const todayTotal=Number(dayStats().yes||0)+Number(dayStats().no||0);
+    const monthTotal=Number(redesignedStats.yes||0)+Number(redesignedStats.no||0);
+    const heardRate=percentage(Number(redesignedStats.yes||0),monthTotal);
+    const closeRate=percentage(Number(redesignedStats.sales||0),monthTotal);
+    const badges=[];
+    if(todayTotal>50) badges.push({tone:'green',label:'Motivado',tooltip:'Este vendedor tiene muchísima motivación y no deja pasar ningún comercio'});
+    else if(todayTotal<=20) badges.push({tone:'red',label:'Desmotivado',tooltip:'Este vendedor está desmotivado y no entra a suficientes comercios'});
+    else if(todayTotal<=30) badges.push({tone:'yellow',label:'Desmotivado',tooltip:'Este vendedor está desmotivado y no entra a suficientes comercios'});
+    if(heardRate>70) badges.push({tone:'green',label:'Llamativo',tooltip:'La mayoría de clientes escucha a este vendedor cuando habla con ellos'});
+    if(closeRate>5) badges.push({tone:'green',label:'Buen cierre',tooltip:'Este vendedor no tiene problema en hacer el cierre de una venta'});
+    container.innerHTML='';
+    badges.forEach(item=>{const badge=document.createElement('span');badge.className='seller-badge '+item.tone;badge.textContent=item.label;badge.dataset.tooltip=item.tooltip;container.appendChild(badge);});
+}
+function renderDaily(){ const rows=document.getElementById('dailyRows');const entries=Object.entries(redesignedStats.days).filter(([key,value])=>monthOf(key)===currentMonth()&&(value.yes||value.no||value.sales)).sort((a,b)=>b[0].localeCompare(a[0]));rows.innerHTML='';if(!entries.length){rows.innerHTML='<tr><td colspan="5" class="daily-empty">Todavía no hay visitas registradas este mes.</td></tr>';return;}entries.forEach(([key,value])=>{const total=Number(value.yes||0)+Number(value.no||0);const row=document.createElement('tr');row.innerHTML='<td class="day-name">'+formatDay(key)+'</td><td>'+total+'</td><td class="number">'+percentage(Number(value.sales||0),total)+'%</td><td class="number">'+percentage(Number(value.yes||0),total)+'%</td><td class="number">'+Number(value.sales||0)+'</td>';rows.appendChild(row);});}
+function renderPerformance(){const total=Number(redesignedStats.yes||0)+Number(redesignedStats.no||0);const todayData=dayStats();const todayTotal=Number(todayData.yes||0)+Number(todayData.no||0);document.getElementById('monthVisitors').textContent=total;document.getElementById('todayVisitors').textContent=todayTotal;document.getElementById('todaySales').textContent=Number(todayData.sales||0);document.getElementById('monthSales').textContent=Number(redesignedStats.sales||0);document.getElementById('todayRate').textContent=percentage(Number(todayData.sales||0),todayTotal)+'%';}
+function renderObjections(){const list=document.getElementById('objectionTags');list.innerHTML='';const yes=Number(redesignedStats.yes||0);const items=[...redesignedStats.objections].sort((a,b)=>Number(b.count||0)-Number(a.count||0)).filter(item=>yes&&Number(item.count||0)/yes*100>=20);if(!items.length){list.innerHTML='<span class="profile-empty">Todavía no hay objeciones por encima del umbral del 20%.</span>';return;}items.forEach(item=>{const ratio=Number(item.count||0)/yes*100;const tag=document.createElement('div');tag.className='objection-tag '+(ratio>50?'tag-danger':'tag-warning');tag.innerHTML='<span>'+escapeHtml(item.text)+'</span><span class="tag-count">'+Number(item.count||0)+'</span><div class="objection-tooltip"><strong>'+escapeHtml(item.problema||'Respuesta sugerida')+'</strong><span>'+escapeHtml(item.solucion||'No hay solución cargada para esta objeción.')+'</span></div>';list.appendChild(tag);});}
+function radarPoints(values){return values.map((value,index)=>{const angle=(-Math.PI/2)+(index*2*Math.PI/5);const radius=115*(value/100);return (150+Math.cos(angle)*radius)+','+(150+Math.sin(angle)*radius);}).join(' ');}
+function renderGpi(){const todayTotal=Number(dayStats().yes||0)+Number(dayStats().no||0);const monthTotal=Number(redesignedStats.yes||0)+Number(redesignedStats.no||0);const objectionTotal=redesignedStats.objections.reduce((sum,item)=>sum+Number(item.count||0),0);const gross=percentage(Number(redesignedStats.sales||0),monthTotal);const sales=Number(redesignedStats.sales||0);const salesScore=sales>10?100:sales>=7?75:sales>=4?50:25;const values=[Math.min(100,todayTotal/50*100),salesScore,percentage(Number(redesignedStats.yes||0),monthTotal),Math.min(100,monthTotal?objectionTotal/monthTotal*100:0),Math.min(100,gross/20*100)];document.getElementById('gpiShape').setAttribute('points',radarPoints(values));}
+function renderLine(){const chart=document.getElementById('lpChart');const mini=document.getElementById('lpMiniChart');const entries=Object.entries(redesignedStats.days).filter(([key,value])=>monthOf(key)===currentMonth()&&(value.yes||value.no||value.sales)).sort((a,b)=>a[0].localeCompare(b[0]));let cumulative=0;const points=entries.map(([,value])=>{const visitors=Number(value.yes||0)+Number(value.no||0);cumulative+=Number(value.sales||0);return {visitors,cumulative};});const totalVisitors=points.reduce((sum,item)=>sum+item.visitors,0);const maxVisitors=Math.max(1,...points.map(item=>item.visitors));const maxSales=Math.max(1,...points.map(item=>item.cumulative));const makePoints=(width,height,left,bottom)=>points.length?points.map((item,index)=>{const x=left+(index/Math.max(1,points.length-1))*(width-left-20);const y=height-bottom-(item.cumulative/maxSales)*(height-bottom-25);return [x,y];}):[[left,height-bottom],[width-20,height-bottom]];const full=makePoints(760,230,50,45);document.getElementById('lpLine').setAttribute('points',full.map(point=>point.join(',')).join(' '));document.getElementById('lpPoints').innerHTML=full.map(point=>'<circle class="lp-point" cx="'+point[0]+'" cy="'+point[1]+'" r="4"></circle>').join('');const miniPoints=makePoints(240,90,4,12);mini.innerHTML='<polyline class="lp-line" points="'+miniPoints.map(point=>point.join(',')).join(' ')+'"></polyline>';document.getElementById('lpMeta').textContent=totalVisitors+' locales · '+Number(redesignedStats.sales||0)+' ventas';document.getElementById('lpSidebarMeta').textContent=entries.length+' días con actividad';}
+function renderAll(){renderRanks();renderSellerBadges();renderDaily();renderPerformance();renderObjections();renderGpi();renderLine();document.getElementById('salesValue').textContent=Number(redesignedStats.sales||0);}
+document.getElementById('heardYes').addEventListener('click',()=>changeResponse('yes'));document.getElementById('heardNo').addEventListener('click',()=>changeResponse('no'));document.getElementById('salesUp').addEventListener('click',()=>changeSales(1));document.getElementById('salesDown').addEventListener('click',()=>changeSales(-1));document.getElementById('objectionSearch').addEventListener('input',event=>renderSuggestions(event.target.value));document.addEventListener('click',event=>{if(!event.target.closest('.search-panel'))document.getElementById('suggestions').classList.remove('open');});
+renderAll();
 </script>
 </body>
 </html>
