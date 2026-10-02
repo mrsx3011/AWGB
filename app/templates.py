@@ -1682,9 +1682,10 @@ HTML_STATS_REDESIGNED = """
         .light .panel-header h2{ color:var(--ink-900); }
         .panel-header p{ color:#93A2B0; font-size:12px; margin:5px 0 0; }
         .light .panel-header p{ color:var(--ink-600); }
-        .gpi-overview{ display:grid; grid-template-columns:minmax(250px,.8fr) minmax(0,1.5fr); gap:20px; }
-        .radar-wrap{ min-height:290px; display:grid; place-items:center; background:#171D24; border:1px solid #303B46; border-radius:8px; }
-        .radar{ width:100%; max-width:300px; height:auto; }
+        .gpi-overview{ display:grid; grid-template-columns:minmax(250px,.8fr) minmax(0,1.5fr); gap:20px; min-width:0; }
+        .gpi-overview > *{ min-width:0; }
+        .radar-wrap{ width:100%; min-height:290px; display:grid; place-items:center; overflow:hidden; background:#171D24; border:1px solid #303B46; border-radius:8px; }
+        .radar{ display:block; width:min(100%,300px); max-width:300px; height:auto; margin:0 auto; }
         .radar-grid{ fill:none; stroke:#35424F; stroke-width:1; }
         .radar-axis{ stroke:#35424F; stroke-width:1; }
         .radar-shape{ fill:rgba(45,219,138,.2); stroke:#F0B84B; stroke-width:2; transition:all .4s ease; }
@@ -1736,6 +1737,7 @@ HTML_STATS_REDESIGNED = """
         .objection-tag:hover .objection-tooltip{ opacity:1; transform:translateY(0); }
         .objection-tooltip strong{ display:block; color:#F0B84B; font-size:11px; margin-bottom:5px; }.objection-tooltip span{ display:block; font-size:11px; line-height:1.4; }
         @media(max-width:980px){ .stats-workspace{ grid-template-columns:1fr; }.stats-sidebar{ display:grid; grid-template-columns:1.1fr 1fr 1fr; }.stats-profile{ border-bottom:0; border-right:1px solid #303B46; }.rank-stack{ grid-column:2 / -1; grid-template-columns:repeat(3,1fr); }.rank-card{ border-bottom:0; border-right:1px solid #303B46; }.rank-card:last-child{ border-right:0; }.lp-sidebar{ grid-column:1 / -1; border-top:1px solid #303B46; } }
+        @media(max-width:760px){ .gpi-overview{ grid-template-columns:minmax(0,1fr); gap:14px; }.radar-wrap{ min-height:270px; }.radar{ width:min(100%,300px); } }
         @media(max-width:700px){ body{ padding:16px 10px 50px; }.stats-sidebar{ display:block; }.stats-profile{ border-right:0; border-bottom:1px solid #303B46; }.rank-stack{ display:grid; grid-template-columns:1fr; }.rank-card{ border-right:0; border-bottom:1px solid #303B46; }.gpi-overview,.stats-entry{ grid-template-columns:1fr; }.performance-grid{ grid-template-columns:repeat(2,1fr); }.daily-table{ min-width:620px; }.stats-panel{ overflow:hidden; } }
     </style>
 </head>
