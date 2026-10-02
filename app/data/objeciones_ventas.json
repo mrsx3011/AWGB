@@ -1648,5 +1648,143 @@
     "cantidad": 0,
     "problema": "Precio condicionante",
     "solucion": "Confirmar si existen otras barreras además del precio."
+  },
+    {
+    "objecion": "No se encuentra el dueño",
+    "cantidad": 0,
+    "problema": "Decisor ausente",
+    "solucion": "Preguntar cuándo se lo puede encontrar y acordar un horario concreto para volver a llamar."
+  },
+  {
+    "objecion": "No se encuentra el titular",
+    "cantidad": 0,
+    "problema": "Decisor ausente",
+    "solucion": "Preguntar en qué horario suele estar disponible y pedir un medio de contacto directo."
+  },
+  {
+    "objecion": "El dueño no está",
+    "cantidad": 0,
+    "problema": "Decisor ausente",
+    "solucion": "Consultar cuándo regresa y acordar el mejor momento para contactarlo."
+  },
+  {
+    "objecion": "El titular no está",
+    "cantidad": 0,
+    "problema": "Decisor ausente",
+    "solucion": "Preguntar cuándo puede atender y quién más podría ayudar mientras tanto."
+  },
+  {
+    "objecion": "No estoy interesado, no gracias",
+    "cantidad": 0,
+    "problema": "Rechazo inicial",
+    "solucion": "Validar la respuesta y preguntar si existe algún motivo específico."
+  },
+  {
+    "objecion": "Tengo que hablar con mi mujer",
+    "cantidad": 0,
+    "problema": "Decisión compartida",
+    "solucion": "Preguntar qué aspecto necesita consultar y qué información le ayudaría a compartir."
+  },
+  {
+    "objecion": "Tengo que hablar con mi esposo",
+    "cantidad": 0,
+    "problema": "Decisión compartida",
+    "solucion": "Preguntar qué aspecto decidirán juntos y ofrecer incluirlo en la conversación."
+  },
+  {
+    "objecion": "Tengo que hablar con un familiar",
+    "cantidad": 0,
+    "problema": "Decisión compartida",
+    "solucion": "Identificar quién participa en la decisión y qué necesita conocer."
+  },
+  {
+    "objecion": "Tengo que hablar con mi socio",
+    "cantidad": 0,
+    "problema": "Decisión compartida",
+    "solucion": "Preguntar qué criterios evaluará el socio y ofrecer una conversación conjunta."
+  },
+    {
+    "objecion": "Dejame que verifico todo lo que me estás diciendo y te llamo",
+    "cantidad": 0,
+    "problema": "Verificación pendiente",
+    "solucion": "Facilitar canales oficiales para verificar, dejar un contacto directo y acordar cuándo hablar de nuevo."
+  },
+  {
+    "objecion": "¿Cómo sé que no me van a estafar?",
+    "cantidad": 0,
+    "problema": "Desconfianza elevada",
+    "solucion": "Validar la preocupación, mostrar credencial y ofrecer canales oficiales de Getnet Santander para verificar."
+  },
+  {
+    "objecion": "¿Por qué te tengo que dar mi documento?",
+    "cantidad": 0,
+    "problema": "Privacidad percibida",
+    "solucion": "Explicar que es un requisito para dar de alta el comercio, qué se hace con el dato y cómo se protege."
+  },
+  {
+    "objecion": "Después te escribo",
+    "cantidad": 0,
+    "problema": "Seguimiento incierto",
+    "solucion": "Acordar una instancia concreta de seguimiento y preguntar qué necesita evaluar antes."
+  },
+  {
+    "objecion": "Dejame un número",
+    "cantidad": 0,
+    "problema": "Seguimiento incierto",
+    "solucion": "Dejar el contacto y acordar una fecha y un horario concretos para el seguimiento."
+  },
+  {
+    "objecion": "Después te llamo",
+    "cantidad": 0,
+    "problema": "Seguimiento incierto",
+    "solucion": "Preguntar qué necesita evaluar antes de llamar y acordar un seguimiento concreto."
+  },
+  {
+    "objecion": "Solo soy el vendedor",
+    "cantidad": 0,
+    "problema": "Decisor ausente",
+    "solucion": "Preguntar quién toma la decisión, cuándo se lo puede encontrar y dejar material para que se lo comparta."
+  },
+  {
+    "objecion": "Solo soy el encargado",
+    "cantidad": 0,
+    "problema": "Decisor ausente",
+    "solucion": "Identificar al dueño, pedir un horario o un contacto directo y explicar brevemente el motivo de la visita."
+  },
+  {
+    "objecion": "No uso posnet",
+    "cantidad": 0,
+    "problema": "Necesidad inexistente",
+    "solucion": "Preguntar cómo cobra actualmente y si algún cliente le pidió pagar con tarjeta."
+  },
+  {
+    "objecion": "No uso terminal de cobro",
+    "cantidad": 0,
+    "problema": "Necesidad inexistente",
+    "solucion": "Explorar si pierde ventas por no aceptar tarjeta y qué cambiaría para considerarlo."
+  },
+  {
+    "objecion": "Solo me manejo con efectivo",
+    "cantidad": 0,
+    "problema": "Hábito establecido",
+    "solucion": "Preguntar si alguna vez perdió una venta por no aceptar tarjeta y qué le preocupa de cobrar electrónicamente."
+  },
+  {
+    "objecion": "Solo me manejo con transferencia",
+    "cantidad": 0,
+    "problema": "Solución satisfactoria",
+    "solucion": "Preguntar qué resultado obtiene con las transferencias y qué pasa con los clientes que quieren pagar con tarjeta."
+  },
+  {
+    "objecion": "Solo me manejo con alias",
+    "cantidad": 0,
+    "problema": "Solución satisfactoria",
+    "solucion": "Explorar qué valora del alias y cuántos clientes piden pagar con tarjeta."
+  },
+  {
+    "objecion": "Estoy a punto de cerrar el local",
+    "cantidad": 0,
+    "problema": "Momento inconveniente",
+    "solucion": "Respetar el momento, dejar un contacto y acordar un horario concreto para volver."
   }
 ]
